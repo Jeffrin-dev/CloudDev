@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const managedLabel = "clouddev"
@@ -36,7 +37,7 @@ type ContainerOptions struct {
 }
 
 type dockerClient interface {
-	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (container.CreateResponse, error)
+	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error)
 	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
 	ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
 	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
@@ -94,6 +95,7 @@ func (m *dockerManager) StartContainer(ctx context.Context, opts ContainerOption
 			Labels:       labels,
 		},
 		&container.HostConfig{PortBindings: portBindings},
+		nil,
 		nil,
 		opts.Name,
 	)
