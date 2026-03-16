@@ -7,6 +7,7 @@ import (
 
 	"github.com/clouddev/clouddev/internal/config"
 	"github.com/clouddev/clouddev/internal/docker"
+	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +22,15 @@ var upCmd = &cobra.Command{
 		cfg, err := config.LoadConfig("clouddev.yml")
 		if err != nil {
 			return err
+		}
+
+		if cfg.Services.S3 {
+			go func() {
+				if err := s3.Start(cfg.Ports.S3); err != nil {
+					fmt.Fprintf(os.Stderr, "S3 server error: %v\n", err)
+				}
+			}()
+			printSuccess("S3 server starting on port %d", cfg.Ports.S3)
 		}
 
 		manager, err := docker.NewManager(os.Stdout)
@@ -58,14 +68,6 @@ var upCmd = &cobra.Command{
 func buildServiceOptions(cfg *config.Config) []docker.ContainerOptions {
 	services := make([]docker.ContainerOptions, 0, 4)
 
-	if cfg.Services.S3 {
-		services = append(services, docker.ContainerOptions{
-			Name:        "clouddev-s3",
-			Image:       "minio/minio",
-			PortMapping: map[int]int{cfg.Ports.S3: cfg.Ports.S3},
-			Labels:      map[string]string{"service": "s3"},
-		})
-	}
 	if cfg.Services.DynamoDB {
 		services = append(services, docker.ContainerOptions{
 			Name:        "clouddev-dynamodb",
