@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -37,7 +36,7 @@ type ContainerOptions struct {
 }
 
 type dockerClient interface {
-	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *container.Platform, containerName string) (container.CreateResponse, error)
+	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (container.CreateResponse, error)
 	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
 	ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
 	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
@@ -96,7 +95,6 @@ func (m *dockerManager) StartContainer(ctx context.Context, opts ContainerOption
 		},
 		&container.HostConfig{PortBindings: portBindings},
 		nil,
-		nil,
 		opts.Name,
 	)
 	if err != nil {
@@ -111,8 +109,9 @@ func (m *dockerManager) StartContainer(ctx context.Context, opts ContainerOption
 }
 
 func (m *dockerManager) StopContainer(ctx context.Context, id string) error {
-	timeout := 10 * time.Second
-	if err := m.client.ContainerStop(ctx, id, container.StopOptions{Timeout: &timeout}); err != nil {
+	noWaitTimeout := 0
+	stopOptions := container.StopOptions{Timeout: &noWaitTimeout}
+	if err := m.client.ContainerStop(ctx, id, stopOptions); err != nil {
 		return fmt.Errorf("failed to stop container %q: %w", id, err)
 	}
 	return nil
