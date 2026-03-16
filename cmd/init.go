@@ -1,18 +1,29 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
 
-const clouddevTemplate = `version: "1"
-project:
-  name: %s
-services:
-  - localstack
+const clouddevTemplate = `services:
+  s3: true
+  dynamodb: true
+  lambda: true
+  sqs: false
+  api_gateway: true
+
+ports:
+  s3: 4566
+  lambda: 4574
+  dynamodb: 4569
+  sqs: 4576
+  api_gateway: 4572
+
+lambda:
+  hot_reload: true
+  functions_dir: ./functions
 `
 
 var initCmd = &cobra.Command{
@@ -45,7 +56,7 @@ var initCmd = &cobra.Command{
 		}
 
 		configPath := filepath.Join(projectPath, "clouddev.yml")
-		content := []byte(fmt.Sprintf(clouddevTemplate, projectName))
+		content := []byte(clouddevTemplate)
 		if err := os.WriteFile(configPath, content, 0o644); err != nil {
 			return printError("failed to write '%s': %v", configPath, err)
 		}
