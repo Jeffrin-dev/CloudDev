@@ -12,12 +12,13 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/errdefs"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type mockDockerClient struct {
-	createFn       func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (container.CreateResponse, error)
+	createFn       func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error)
 	inspectFn      func(ctx context.Context, containerID string) (container.InspectResponse, error)
 	listFn         func(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
 	startFn        func(ctx context.Context, containerID string, options container.StartOptions) error
@@ -26,8 +27,8 @@ type mockDockerClient struct {
 	pullFn         func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
 }
 
-func (m *mockDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (container.CreateResponse, error) {
-	return m.createFn(ctx, config, hostConfig, networkingConfig, containerName)
+func (m *mockDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error) {
+	return m.createFn(ctx, config, hostConfig, networkingConfig, platform, containerName)
 }
 
 func (m *mockDockerClient) ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error) {
@@ -68,7 +69,7 @@ func TestStartContainerPullsMissingImageAndAddsCloudDevLabel(t *testing.T) {
 		pullFn: func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error) {
 			return io.NopCloser(bytes.NewBufferString("pulling...")), nil
 		},
-		createFn: func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (container.CreateResponse, error) {
+		createFn: func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error) {
 			createdConfig = config
 			return container.CreateResponse{ID: "container-123"}, nil
 		},
@@ -114,7 +115,7 @@ func TestStopAllOnlyTargetsManagedContainers(t *testing.T) {
 			stopped = append(stopped, containerID)
 			return nil
 		},
-		createFn: func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (container.CreateResponse, error) {
+		createFn: func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error) {
 			return container.CreateResponse{}, nil
 		},
 		inspectFn: func(ctx context.Context, containerID string) (container.InspectResponse, error) {
@@ -141,7 +142,7 @@ func TestIsRunningReturnsFalseForMissingContainer(t *testing.T) {
 		inspectFn: func(ctx context.Context, containerID string) (container.InspectResponse, error) {
 			return container.InspectResponse{}, errdefs.NotFound(errors.New("missing"))
 		},
-		createFn: func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (container.CreateResponse, error) {
+		createFn: func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error) {
 			return container.CreateResponse{}, nil
 		},
 		listFn:  func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) { return nil, nil },
