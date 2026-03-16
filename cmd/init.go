@@ -10,7 +10,7 @@ import (
 const clouddevTemplate = `services:
   s3: true
   dynamodb: true
-  lambda: true
+  lambda: false
   sqs: false
   api_gateway: true
 
