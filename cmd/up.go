@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/clouddev/clouddev/internal/config"
 	"github.com/clouddev/clouddev/internal/docker"
@@ -60,6 +62,12 @@ var upCmd = &cobra.Command{
 		if cfg.Services.APIGateway {
 			printInfo("api_gateway is enabled but managed in Go (no container started)")
 		}
+
+		printInfo("CloudDev is running. Press Ctrl+C to stop...")
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		printInfo("Shutting down...")
 
 		return nil
 	},
