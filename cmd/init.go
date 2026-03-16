@@ -9,10 +9,10 @@ import (
 
 const clouddevTemplate = `services:
   s3: true
-  dynamodb: true
+  dynamodb: false
   lambda: false
   sqs: false
-  api_gateway: true
+  api_gateway: false
 
 ports:
   s3: 4566
