@@ -1,6 +1,7 @@
 package lambda
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -76,6 +77,10 @@ func (s *server) handleCreateFunction(w http.ResponseWriter, r *http.Request) {
 		FunctionName string            `json:"FunctionName"`
 		Runtime      string            `json:"Runtime"`
 		Handler      string            `json:"Handler"`
+		Role         string            `json:"Role"`
+		Code         struct {
+			ZipFile string `json:"ZipFile"`
+		} `json:"Code"`
 		Code         []byte            `json:"Code"`
 		Environment  map[string]string `json:"Environment"`
 	}
@@ -87,6 +92,15 @@ func (s *server) handleCreateFunction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "ValidationException", "FunctionName is required")
 		return
 	}
+
+	var code []byte
+	if req.Code.ZipFile != "" {
+		decoded, err := base64.StdEncoding.DecodeString(req.Code.ZipFile)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValueException", "Invalid request body")
+			return
+		}
+		code = decoded
 	if req.Runtime == "" {
 		req.Runtime = "provided.al2"
 	}
@@ -99,6 +113,7 @@ func (s *server) handleCreateFunction(w http.ResponseWriter, r *http.Request) {
 		Name:        req.FunctionName,
 		Runtime:     req.Runtime,
 		Handler:     req.Handler,
+		Code:        code,
 		Code:        req.Code,
 		Environment: req.Environment,
 	}
@@ -108,6 +123,7 @@ func (s *server) handleCreateFunction(w http.ResponseWriter, r *http.Request) {
 		"FunctionName": req.FunctionName,
 		"Runtime":      req.Runtime,
 		"Handler":      req.Handler,
+		"FunctionArn":  fmt.Sprintf("arn:aws:lambda:us-east-1:000000000000:function:%s", req.FunctionName),
 		"State":        "Active",
 	})
 }

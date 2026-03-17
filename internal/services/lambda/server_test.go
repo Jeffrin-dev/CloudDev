@@ -2,6 +2,7 @@ package lambda
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,22 @@ func TestRegisterFunctionAppearsInList(t *testing.T) {
 
 	createResp := doLambdaRequest(t, http.MethodPost, srv.URL+"/2015-03-31/functions", map[string]interface{}{
 		"FunctionName": "hello",
+		"Runtime":      "python3.9",
+		"Handler":      "hello.handler",
+		"Role":         "arn:aws:iam::000000000000:role/test",
+		"Code": map[string]interface{}{
+			"ZipFile": base64.StdEncoding.EncodeToString([]byte("zip-content")),
+		},
+	})
+	if createResp.StatusCode != http.StatusCreated {
+		createResp.Body.Close()
+		t.Fatalf("expected 201, got %d", createResp.StatusCode)
+	}
+	var createBody map[string]interface{}
+	decodeJSONBody(t, createResp, &createBody)
+	if createBody["FunctionArn"] != "arn:aws:lambda:us-east-1:000000000000:function:hello" {
+		t.Fatalf("expected function arn in create response, got %#v", createBody)
+	}
 		"Runtime":      "go1.x",
 		"Handler":      "handler",
 	})
