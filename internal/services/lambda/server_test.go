@@ -32,13 +32,6 @@ func TestRegisterFunctionAppearsInList(t *testing.T) {
 	if createBody["FunctionArn"] != "arn:aws:lambda:us-east-1:000000000000:function:hello" {
 		t.Fatalf("expected function arn in create response, got %#v", createBody)
 	}
-		"Runtime":      "go1.x",
-		"Handler":      "handler",
-	})
-	createResp.Body.Close()
-	if createResp.StatusCode != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", createResp.StatusCode)
-	}
 
 	listReq, err := http.NewRequest(http.MethodGet, srv.URL+"/2015-03-31/functions", nil)
 	if err != nil {
