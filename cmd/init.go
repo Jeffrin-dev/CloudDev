@@ -8,8 +8,8 @@ import (
 )
 
 const clouddevTemplate = `services:
-  s3: true
-  dynamodb: false
+  s3: false
+  dynamodb: true
   lambda: false
   sqs: false
   api_gateway: false

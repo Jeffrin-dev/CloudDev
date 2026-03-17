@@ -26,7 +26,6 @@ var upCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
 		if cfg.Services.S3 {
 			go func() {
 				if err := s3.Start(cfg.Ports.S3); err != nil {
@@ -35,7 +34,6 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("S3 server starting on port %d", cfg.Ports.S3)
 		}
-
 		if cfg.Services.DynamoDB {
 			go func() {
 				if err := dynamodb.Start(cfg.Ports.DynamoDB); err != nil {
@@ -44,12 +42,10 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("DynamoDB server starting on port %d", cfg.Ports.DynamoDB)
 		}
-
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
 		}
-
 		ctx := context.Background()
 		services := buildServiceOptions(cfg)
 		for _, service := range services {
@@ -61,39 +57,26 @@ var upCmd = &cobra.Command{
 				printWarning("Service %s is already running", service.Name)
 				continue
 			}
-
 			id, err := manager.StartContainer(ctx, service)
 			if err != nil {
 				return err
 			}
 			printSuccess("Started %s (%s)", service.Name, id)
 		}
-
 		if cfg.Services.APIGateway {
 			printInfo("api_gateway is enabled but managed in Go (no container started)")
 		}
-
 		printInfo("CloudDev is running. Press Ctrl+C to stop...")
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
 		printInfo("Shutting down...")
-
 		return nil
 	},
 }
 
 func buildServiceOptions(cfg *config.Config) []docker.ContainerOptions {
 	services := make([]docker.ContainerOptions, 0, 4)
-
-	if cfg.Services.DynamoDB {
-		services = append(services, docker.ContainerOptions{
-			Name:        "clouddev-dynamodb",
-			Image:       "amazon/dynamodb-local",
-			PortMapping: map[int]int{cfg.Ports.DynamoDB: cfg.Ports.DynamoDB},
-			Labels:      map[string]string{"service": "dynamodb"},
-		})
-	}
 	if cfg.Services.Lambda {
 		services = append(services, docker.ContainerOptions{
 			Name:  "clouddev-lambda",
@@ -116,7 +99,6 @@ func buildServiceOptions(cfg *config.Config) []docker.ContainerOptions {
 			Labels:      map[string]string{"service": "sqs"},
 		})
 	}
-
 	return services
 }
 
