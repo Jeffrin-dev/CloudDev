@@ -11,8 +11,8 @@ const clouddevTemplate = `services:
   s3: true
   dynamodb: true
   lambda: true
-  sqs: false
-  api_gateway: false
+  sqs: true
+  api_gateway: true
 
 ports:
   s3: 4566
