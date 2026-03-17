@@ -9,6 +9,7 @@ import (
 
 	"github.com/clouddev/clouddev/internal/config"
 	"github.com/clouddev/clouddev/internal/docker"
+	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/s3"
@@ -60,6 +61,14 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("SQS server starting on port %d", cfg.Ports.SQS)
 		}
+		if cfg.Services.APIGateway {
+			go func() {
+				if err := apigateway.Start(cfg.Ports.APIGateway, cfg.Ports.Lambda); err != nil {
+					fmt.Fprintf(os.Stderr, "API Gateway server error: %v\n", err)
+				}
+			}()
+			printSuccess("API Gateway starting on port %d", cfg.Ports.APIGateway)
+		}
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
@@ -80,9 +89,6 @@ var upCmd = &cobra.Command{
 				return err
 			}
 			printSuccess("Started %s (%s)", service.Name, id)
-		}
-		if cfg.Services.APIGateway {
-			printInfo("api_gateway is enabled but managed in Go (no container started)")
 		}
 		printInfo("CloudDev is running. Press Ctrl+C to stop...")
 		quit := make(chan os.Signal, 1)
