@@ -81,6 +81,7 @@ func (s *server) handleCreateFunction(w http.ResponseWriter, r *http.Request) {
 		Code         struct {
 			ZipFile string `json:"ZipFile"`
 		} `json:"Code"`
+		Code         []byte            `json:"Code"`
 		Environment  map[string]string `json:"Environment"`
 	}
 	if err := decodeBody(r.Body, &req); err != nil {
@@ -100,6 +101,11 @@ func (s *server) handleCreateFunction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		code = decoded
+	if req.Runtime == "" {
+		req.Runtime = "provided.al2"
+	}
+	if req.Handler == "" {
+		req.Handler = "handler"
 	}
 
 	s.mu.Lock()
@@ -108,6 +114,7 @@ func (s *server) handleCreateFunction(w http.ResponseWriter, r *http.Request) {
 		Runtime:     req.Runtime,
 		Handler:     req.Handler,
 		Code:        code,
+		Code:        req.Code,
 		Environment: req.Environment,
 	}
 	s.mu.Unlock()
