@@ -12,6 +12,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/s3"
+	"github.com/clouddev/clouddev/internal/services/sqs"
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +52,14 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("Lambda server starting on port %d", cfg.Ports.Lambda)
 		}
+		if cfg.Services.SQS {
+			go func() {
+				if err := sqs.Start(cfg.Ports.SQS); err != nil {
+					fmt.Fprintf(os.Stderr, "SQS server error: %v\n", err)
+				}
+			}()
+			printSuccess("SQS server starting on port %d", cfg.Ports.SQS)
+		}
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
@@ -85,15 +94,7 @@ var upCmd = &cobra.Command{
 }
 
 func buildServiceOptions(cfg *config.Config) []docker.ContainerOptions {
-	services := make([]docker.ContainerOptions, 0, 4)
-	if cfg.Services.SQS {
-		services = append(services, docker.ContainerOptions{
-			Name:        "clouddev-sqs",
-			Image:       "softwaremill/elasticmq",
-			PortMapping: map[int]int{cfg.Ports.SQS: cfg.Ports.SQS},
-			Labels:      map[string]string{"service": "sqs"},
-		})
-	}
+	services := make([]docker.ContainerOptions, 0)
 	return services
 }
 
