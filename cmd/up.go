@@ -10,7 +10,6 @@ import (
 	"github.com/clouddev/clouddev/internal/config"
 	"github.com/clouddev/clouddev/internal/docker"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
-	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/spf13/cobra"
 )
@@ -42,14 +41,6 @@ var upCmd = &cobra.Command{
 				}
 			}()
 			printSuccess("DynamoDB server starting on port %d", cfg.Ports.DynamoDB)
-		}
-		if cfg.Services.Lambda {
-			go func() {
-				if err := lambda.Start(cfg.Ports.Lambda, cfg.Lambda.FunctionsDir, cfg.Lambda.HotReload); err != nil {
-					fmt.Fprintf(os.Stderr, "Lambda server error: %v\n", err)
-				}
-			}()
-			printSuccess("Lambda server starting on port %d", cfg.Ports.Lambda)
 		}
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
