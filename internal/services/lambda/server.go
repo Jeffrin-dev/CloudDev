@@ -53,7 +53,7 @@ func Start(port int, functionsDir string, hotReload bool) error {
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == functionsBasePath {
+	if r.URL.Path == functionsBasePath || r.URL.Path == functionsBasePath+"/" {
 		s.handleFunctionsRoot(w, r)
 		return
 	}
