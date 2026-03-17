@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/clouddev/clouddev/internal/config"
+	"github.com/clouddev/clouddev/internal/dashboard"
 	"github.com/clouddev/clouddev/internal/docker"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
@@ -90,6 +91,19 @@ var upCmd = &cobra.Command{
 			}
 			printSuccess("Started %s (%s)", service.Name, id)
 		}
+		go func() {
+			serviceMap := map[string]int{
+				"s3":          cfg.Ports.S3,
+				"dynamodb":    cfg.Ports.DynamoDB,
+				"lambda":      cfg.Ports.Lambda,
+				"sqs":         cfg.Ports.SQS,
+				"api_gateway": cfg.Ports.APIGateway,
+			}
+			if err := dashboard.Start(4580, serviceMap); err != nil {
+				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
+			}
+		}()
+		printSuccess("Dashboard running at http://localhost:4580")
 		printInfo("CloudDev is running. Press Ctrl+C to stop...")
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
