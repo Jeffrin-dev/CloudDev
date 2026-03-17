@@ -9,7 +9,6 @@ import (
 
 	"github.com/clouddev/clouddev/internal/config"
 	"github.com/clouddev/clouddev/internal/docker"
-	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/spf13/cobra"
 )
@@ -34,15 +33,6 @@ var upCmd = &cobra.Command{
 				}
 			}()
 			printSuccess("S3 server starting on port %d", cfg.Ports.S3)
-		}
-
-		if cfg.Services.DynamoDB {
-			go func() {
-				if err := dynamodb.Start(cfg.Ports.DynamoDB); err != nil {
-					fmt.Fprintf(os.Stderr, "DynamoDB server error: %v\n", err)
-				}
-			}()
-			printSuccess("DynamoDB server starting on port %d", cfg.Ports.DynamoDB)
 		}
 
 		manager, err := docker.NewManager(os.Stdout)
