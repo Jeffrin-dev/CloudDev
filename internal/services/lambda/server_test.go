@@ -6,7 +6,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestCreateListInvokeAndDeleteFunction(t *testing.T) {
@@ -95,6 +98,84 @@ func TestCreateFunctionRequiresName(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
+}
+
+func TestHotReloadAutoLoadsNewZipFile(t *testing.T) {
+	t.Parallel()
+	functionsDir := t.TempDir()
+	srv := newServer()
+
+	go srv.watchFunctionsDir(functionsDir, 20*time.Millisecond)
+
+	zipPath := filepath.Join(functionsDir, "processor.zip")
+	if err := os.WriteFile(zipPath, []byte("zip-content"), 0o644); err != nil {
+		t.Fatalf("write zip file: %v", err)
+	}
+
+	waitForFunction(t, srv, "processor", true)
+
+	srv.mu.RLock()
+	fn, ok := srv.functions["processor"]
+	srv.mu.RUnlock()
+	if !ok {
+		t.Fatalf("expected processor function to be auto-loaded")
+	}
+	if string(fn.Code) != "zip-content" {
+		t.Fatalf("expected zip content to be loaded, got %q", string(fn.Code))
+	}
+}
+
+func TestHotReloadDisabledDoesNotAutoLoad(t *testing.T) {
+	t.Parallel()
+	functionsDir := t.TempDir()
+	srv := newServer()
+
+	zipPath := filepath.Join(functionsDir, "disabled.zip")
+	if err := os.WriteFile(zipPath, []byte("zip-content"), 0o644); err != nil {
+		t.Fatalf("write zip file: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	srv.mu.RLock()
+	_, ok := srv.functions["disabled"]
+	srv.mu.RUnlock()
+	if ok {
+		t.Fatalf("expected disabled function not to be auto-loaded when hot reload is off")
+	}
+}
+
+func TestEnsureFunctionsDirCreatesDirectory(t *testing.T) {
+	t.Parallel()
+	base := t.TempDir()
+	functionsDir := filepath.Join(base, "functions")
+
+	if err := ensureFunctionsDir(functionsDir); err != nil {
+		t.Fatalf("ensure functions dir: %v", err)
+	}
+
+	info, err := os.Stat(functionsDir)
+	if err != nil {
+		t.Fatalf("stat functions dir: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("expected %s to be a directory", functionsDir)
+	}
+}
+
+func waitForFunction(t *testing.T, srv *server, functionName string, expected bool) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		srv.mu.RLock()
+		_, ok := srv.functions[functionName]
+		srv.mu.RUnlock()
+		if ok == expected {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for function %s existence=%v", functionName, expected)
 }
 
 func doJSONRequest(t *testing.T, method, url string, body any) *http.Response {

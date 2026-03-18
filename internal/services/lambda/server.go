@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 )
 
 const functionsBasePath = "/2015-03-31/functions"
@@ -45,10 +48,13 @@ func newServer() *server {
 }
 
 func Start(port int, functionsDir string, hotReload bool) error {
-	_ = functionsDir
-	_ = hotReload
-
 	srv := newServer()
+	if hotReload {
+		if err := ensureFunctionsDir(functionsDir); err != nil {
+			return err
+		}
+		go srv.watchFunctionsDir(functionsDir, 2*time.Second)
+	}
 	return http.ListenAndServe(fmt.Sprintf(":%d", port), srv)
 }
 
@@ -191,6 +197,66 @@ func (s *server) deleteFunction(w http.ResponseWriter, functionName string) {
 	}
 	delete(s.functions, functionName)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) watchFunctionsDir(functionsDir string, interval time.Duration) {
+	s.scanFunctionsDir(functionsDir)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.scanFunctionsDir(functionsDir)
+	}
+}
+
+func (s *server) scanFunctionsDir(functionsDir string) {
+	entries, err := os.ReadDir(functionsDir)
+	if err != nil {
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".zip" {
+			continue
+		}
+
+		functionName := entry.Name()[:len(entry.Name())-len(".zip")]
+		if functionName == "" {
+			continue
+		}
+
+		path := filepath.Join(functionsDir, entry.Name())
+		code, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		if s.autoLoadFunction(functionName, code) {
+			fmt.Printf("Auto-loaded Lambda function: %s\n", functionName)
+		}
+	}
+}
+
+func (s *server) autoLoadFunction(functionName string, code []byte) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.functions[functionName]; exists {
+		return false
+	}
+
+	s.functions[functionName] = LambdaFunction{
+		Name:        functionName,
+		Code:        code,
+		Environment: map[string]string{},
+	}
+	return true
+}
+
+func ensureFunctionsDir(functionsDir string) error {
+	if functionsDir == "" {
+		return nil
+	}
+	return os.MkdirAll(functionsDir, 0o755)
 }
 
 func functionARN(name string) string {
