@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/clouddev/clouddev/internal/persist"
 )
 
 const xmlContentType = "application/xml"
@@ -26,13 +28,68 @@ type server struct {
 	buckets map[string]map[string]object
 }
 
+var (
+	persistedStateMu sync.RWMutex
+	persistedState   = persist.S3State{Buckets: make(map[string]persist.S3BucketState)}
+)
+
 func newServer() *server {
 	return &server{buckets: make(map[string]map[string]object)}
 }
 
 func Start(port int) error {
 	srv := newServer()
+	srv.restore(loadPersistedState())
 	return http.ListenAndServe(fmt.Sprintf(":%d", port), srv)
+}
+
+func LoadState(state persist.S3State) {
+	persistedStateMu.Lock()
+	defer persistedStateMu.Unlock()
+	persistedState = clonePersistedS3State(state)
+}
+
+func loadPersistedState() persist.S3State {
+	persistedStateMu.RLock()
+	defer persistedStateMu.RUnlock()
+	return clonePersistedS3State(persistedState)
+}
+
+func (s *server) restore(state persist.S3State) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.buckets = make(map[string]map[string]object, len(state.Buckets))
+	for bucketName, bucketState := range state.Buckets {
+		objects := make(map[string]object, len(bucketState.Objects))
+		for key, savedObject := range bucketState.Objects {
+			etag := savedObject.ETag
+			if etag == "" {
+				etag = fmt.Sprintf("%x", md5.Sum(savedObject.Data))
+			}
+			objects[key] = object{
+				data:         append([]byte(nil), savedObject.Data...),
+				lastModified: time.Now().UTC(),
+				etag:         etag,
+			}
+		}
+		s.buckets[bucketName] = objects
+	}
+}
+
+func clonePersistedS3State(state persist.S3State) persist.S3State {
+	out := persist.S3State{Buckets: make(map[string]persist.S3BucketState, len(state.Buckets))}
+	for bucketName, bucketState := range state.Buckets {
+		objects := make(map[string]persist.S3ObjectState, len(bucketState.Objects))
+		for key, objectState := range bucketState.Objects {
+			objects[key] = persist.S3ObjectState{
+				Data: append([]byte(nil), objectState.Data...),
+				ETag: objectState.ETag,
+			}
+		}
+		out.Buckets[bucketName] = persist.S3BucketState{Objects: objects}
+	}
+	return out
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
