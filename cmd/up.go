@@ -10,7 +10,6 @@ import (
 	"github.com/clouddev/clouddev/internal/config"
 	"github.com/clouddev/clouddev/internal/dashboard"
 	"github.com/clouddev/clouddev/internal/docker"
-	"github.com/clouddev/clouddev/internal/persist"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/lambda"
@@ -31,13 +30,6 @@ var upCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		state := persist.State{}
-		if err := persist.Load(&state); err != nil {
-			printWarning("State file is corrupted, starting fresh: %v", err)
-			state = persist.State{}
-		}
-		s3.LoadState(state.S3)
-		dynamodb.LoadState(state.DynamoDB)
 		if cfg.Services.S3 {
 			go func() {
 				if err := s3.Start(cfg.Ports.S3); err != nil {

@@ -7,8 +7,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-
-	"github.com/clouddev/clouddev/internal/persist"
 )
 
 const jsonContentType = "application/x-amz-json-1.0"
@@ -23,63 +21,12 @@ type server struct {
 	tables map[string]*table
 }
 
-var (
-	persistedStateMu sync.RWMutex
-	persistedState   = persist.DynamoDBState{Tables: make(map[string]persist.DynamoDBTableState)}
-)
-
 func newServer() *server {
 	return &server{tables: make(map[string]*table)}
 }
 
 func Start(port int) error {
-	srv := newServer()
-	srv.restore(loadPersistedState())
-	return http.ListenAndServe(fmt.Sprintf(":%d", port), srv)
-}
-
-func LoadState(state persist.DynamoDBState) {
-	persistedStateMu.Lock()
-	defer persistedStateMu.Unlock()
-	persistedState = clonePersistedDynamoState(state)
-}
-
-func loadPersistedState() persist.DynamoDBState {
-	persistedStateMu.RLock()
-	defer persistedStateMu.RUnlock()
-	return clonePersistedDynamoState(persistedState)
-}
-
-func (s *server) restore(state persist.DynamoDBState) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.tables = make(map[string]*table, len(state.Tables))
-	for tableName, tableState := range state.Tables {
-		items := make(map[string]map[string]interface{}, len(tableState.Items))
-		for itemKey, item := range tableState.Items {
-			items[itemKey] = cloneMap(item)
-		}
-		s.tables[tableName] = &table{
-			hashKey: tableState.HashKey,
-			items:   items,
-		}
-	}
-}
-
-func clonePersistedDynamoState(state persist.DynamoDBState) persist.DynamoDBState {
-	out := persist.DynamoDBState{Tables: make(map[string]persist.DynamoDBTableState, len(state.Tables))}
-	for tableName, tableState := range state.Tables {
-		items := make(map[string]map[string]interface{}, len(tableState.Items))
-		for itemKey, item := range tableState.Items {
-			items[itemKey] = cloneMap(item)
-		}
-		out.Tables[tableName] = persist.DynamoDBTableState{
-			HashKey: tableState.HashKey,
-			Items:   items,
-		}
-	}
-	return out
+	return http.ListenAndServe(fmt.Sprintf(":%d", port), newServer())
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -103,8 +50,6 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch target {
 	case "DynamoDB_20120810.CreateTable":
 		s.handleCreateTable(w, payload)
-	case "DynamoDB_20120810.DescribeTable":
-		s.handleDescribeTable(w, payload)
 	case "DynamoDB_20120810.DeleteTable":
 		s.handleDeleteTable(w, payload)
 	case "DynamoDB_20120810.ListTables":
@@ -175,33 +120,6 @@ func (s *server) handleDeleteTable(w http.ResponseWriter, payload map[string]int
 		"TableDescription": map[string]interface{}{
 			"TableName":   tableName,
 			"TableStatus": "DELETING",
-		},
-	})
-}
-
-func (s *server) handleDescribeTable(w http.ResponseWriter, payload map[string]interface{}) {
-	tableName, ok := stringField(payload, "TableName")
-	if !ok || tableName == "" {
-		writeError(w, http.StatusBadRequest, "ValidationException", "TableName is required")
-		return
-	}
-
-	s.mu.RLock()
-	tbl, exists := s.tables[tableName]
-	s.mu.RUnlock()
-	if !exists {
-		writeError(w, http.StatusBadRequest, "ResourceNotFoundException", "Requested resource not found")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"Table": map[string]interface{}{
-			"TableName":   tableName,
-			"TableStatus": "ACTIVE",
-			"KeySchema": []map[string]interface{}{{
-				"AttributeName": tbl.hashKey,
-				"KeyType":       "HASH",
-			}},
 		},
 	})
 }
