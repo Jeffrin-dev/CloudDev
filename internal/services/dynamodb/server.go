@@ -26,9 +26,9 @@ type server struct {
 var (
 	persistedStateMu sync.RWMutex
 	persistedState   = persist.DynamoDBState{Tables: make(map[string]persist.DynamoDBTableState)}
-	activeServerMu   sync.RWMutex
-	activeServer     *server
 )
+
+var activeServer *server
 
 func newServer() *server {
 	return &server{tables: make(map[string]*table)}
@@ -37,18 +37,27 @@ func newServer() *server {
 func Start(port int) error {
 	srv := newServer()
 	srv.restore(loadPersistedState())
-	setActiveServer(srv)
+	activeServer = srv
 	return http.ListenAndServe(fmt.Sprintf(":%d", port), srv)
 }
 
-func GetState() persist.DynamoDBState {
-	activeServerMu.RLock()
-	srv := activeServer
-	activeServerMu.RUnlock()
-	if srv == nil {
-		return loadPersistedState()
+func GetState() map[string]map[string]map[string]interface{} {
+	if activeServer == nil {
+		return nil
 	}
-	return srv.snapshot()
+	activeServer.mu.RLock()
+	defer activeServer.mu.RUnlock()
+
+	state := make(map[string]map[string]map[string]interface{}, len(activeServer.tables))
+	for tableName, tbl := range activeServer.tables {
+		items := make(map[string]map[string]interface{}, len(tbl.items)+1)
+		items["__clouddev_hash_key"] = map[string]interface{}{"name": tbl.hashKey}
+		for itemKey, item := range tbl.items {
+			items[itemKey] = cloneMap(item)
+		}
+		state[tableName] = items
+	}
+	return state
 }
 
 func LoadState(state persist.DynamoDBState) {
@@ -61,12 +70,6 @@ func loadPersistedState() persist.DynamoDBState {
 	persistedStateMu.RLock()
 	defer persistedStateMu.RUnlock()
 	return clonePersistedDynamoState(persistedState)
-}
-
-func setActiveServer(srv *server) {
-	activeServerMu.Lock()
-	defer activeServerMu.Unlock()
-	activeServer = srv
 }
 
 func (s *server) restore(state persist.DynamoDBState) {
@@ -84,25 +87,6 @@ func (s *server) restore(state persist.DynamoDBState) {
 			items:   items,
 		}
 	}
-}
-
-func (s *server) snapshot() persist.DynamoDBState {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	state := persist.DynamoDBState{Tables: make(map[string]persist.DynamoDBTableState, len(s.tables))}
-	for tableName, tbl := range s.tables {
-		items := make(map[string]map[string]interface{}, len(tbl.items))
-		for itemKey, item := range tbl.items {
-			items[itemKey] = cloneMap(item)
-		}
-		state.Tables[tableName] = persist.DynamoDBTableState{
-			HashKey: tbl.hashKey,
-			Items:   items,
-		}
-	}
-
-	return state
 }
 
 func clonePersistedDynamoState(state persist.DynamoDBState) persist.DynamoDBState {

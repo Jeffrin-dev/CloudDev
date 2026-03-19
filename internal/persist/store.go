@@ -34,6 +34,31 @@ type DynamoDBTableState struct {
 	Items   map[string]map[string]interface{} `json:"items"`
 }
 
+func (s *State) UnmarshalJSON(data []byte) error {
+	type rawState struct {
+		S3       json.RawMessage `json:"s3"`
+		DynamoDB json.RawMessage `json:"dynamodb"`
+	}
+
+	var raw rawState
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	s3State, err := decodeS3State(raw.S3)
+	if err != nil {
+		return err
+	}
+	dynamoState, err := decodeDynamoDBState(raw.DynamoDB)
+	if err != nil {
+		return err
+	}
+
+	s.S3 = s3State
+	s.DynamoDB = dynamoState
+	return nil
+}
+
 func Save(state interface{}) error {
 	path, err := stateFilePath()
 	if err != nil {
@@ -77,4 +102,62 @@ func stateFilePath() (string, error) {
 		return "", fmt.Errorf("resolve home directory: %w", err)
 	}
 	return filepath.Join(home, ".clouddev", "state.json"), nil
+}
+
+func decodeS3State(data json.RawMessage) (S3State, error) {
+	if len(data) == 0 || string(data) == "null" {
+		return S3State{}, nil
+	}
+
+	var structured S3State
+	if err := json.Unmarshal(data, &structured); err == nil && structured.Buckets != nil {
+		return structured, nil
+	}
+
+	var raw map[string]map[string][]byte
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return S3State{}, err
+	}
+
+	state := S3State{Buckets: make(map[string]S3BucketState, len(raw))}
+	for bucketName, objects := range raw {
+		bucketState := S3BucketState{Objects: make(map[string]S3ObjectState, len(objects))}
+		for key, objectData := range objects {
+			bucketState.Objects[key] = S3ObjectState{Data: objectData}
+		}
+		state.Buckets[bucketName] = bucketState
+	}
+	return state, nil
+}
+
+func decodeDynamoDBState(data json.RawMessage) (DynamoDBState, error) {
+	if len(data) == 0 || string(data) == "null" {
+		return DynamoDBState{}, nil
+	}
+
+	var structured DynamoDBState
+	if err := json.Unmarshal(data, &structured); err == nil && structured.Tables != nil {
+		return structured, nil
+	}
+
+	var raw map[string]map[string]map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return DynamoDBState{}, err
+	}
+
+	state := DynamoDBState{Tables: make(map[string]DynamoDBTableState, len(raw))}
+	for tableName, items := range raw {
+		tableState := DynamoDBTableState{Items: make(map[string]map[string]interface{})}
+		for itemKey, item := range items {
+			if itemKey == "__clouddev_hash_key" {
+				if name, ok := item["name"].(string); ok {
+					tableState.HashKey = name
+				}
+				continue
+			}
+			tableState.Items[itemKey] = item
+		}
+		state.Tables[tableName] = tableState
+	}
+	return state, nil
 }

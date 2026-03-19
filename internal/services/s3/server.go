@@ -31,9 +31,9 @@ type server struct {
 var (
 	persistedStateMu sync.RWMutex
 	persistedState   = persist.S3State{Buckets: make(map[string]persist.S3BucketState)}
-	activeServerMu   sync.RWMutex
-	activeServer     *server
 )
+
+var activeServer *server
 
 func newServer() *server {
 	return &server{buckets: make(map[string]map[string]object)}
@@ -42,18 +42,26 @@ func newServer() *server {
 func Start(port int) error {
 	srv := newServer()
 	srv.restore(loadPersistedState())
-	setActiveServer(srv)
+	activeServer = srv
 	return http.ListenAndServe(fmt.Sprintf(":%d", port), srv)
 }
 
-func GetState() persist.S3State {
-	activeServerMu.RLock()
-	srv := activeServer
-	activeServerMu.RUnlock()
-	if srv == nil {
-		return loadPersistedState()
+func GetState() map[string]map[string][]byte {
+	if activeServer == nil {
+		return nil
 	}
-	return srv.snapshot()
+	activeServer.mu.RLock()
+	defer activeServer.mu.RUnlock()
+
+	state := make(map[string]map[string][]byte, len(activeServer.buckets))
+	for bucketName, objects := range activeServer.buckets {
+		bucketState := make(map[string][]byte, len(objects))
+		for key, obj := range objects {
+			bucketState[key] = append([]byte(nil), obj.data...)
+		}
+		state[bucketName] = bucketState
+	}
+	return state
 }
 
 func LoadState(state persist.S3State) {
@@ -66,12 +74,6 @@ func loadPersistedState() persist.S3State {
 	persistedStateMu.RLock()
 	defer persistedStateMu.RUnlock()
 	return clonePersistedS3State(persistedState)
-}
-
-func setActiveServer(srv *server) {
-	activeServerMu.Lock()
-	defer activeServerMu.Unlock()
-	activeServer = srv
 }
 
 func (s *server) restore(state persist.S3State) {
@@ -94,25 +96,6 @@ func (s *server) restore(state persist.S3State) {
 		}
 		s.buckets[bucketName] = objects
 	}
-}
-
-func (s *server) snapshot() persist.S3State {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	state := persist.S3State{Buckets: make(map[string]persist.S3BucketState, len(s.buckets))}
-	for bucketName, objects := range s.buckets {
-		bucketState := persist.S3BucketState{Objects: make(map[string]persist.S3ObjectState, len(objects))}
-		for key, obj := range objects {
-			bucketState.Objects[key] = persist.S3ObjectState{
-				Data: append([]byte(nil), obj.data...),
-				ETag: obj.etag,
-			}
-		}
-		state.Buckets[bucketName] = bucketState
-	}
-
-	return state
 }
 
 func clonePersistedS3State(state persist.S3State) persist.S3State {

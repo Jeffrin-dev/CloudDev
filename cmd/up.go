@@ -116,15 +116,15 @@ var upCmd = &cobra.Command{
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
-		state = persist.State{}
-		if cfg.Services.S3 {
-			state.S3 = s3.GetState()
+		printInfo("Saving state...")
+		stateToSave := map[string]interface{}{
+			"s3":       s3.GetState(),
+			"dynamodb": dynamodb.GetState(),
 		}
-		if cfg.Services.DynamoDB {
-			state.DynamoDB = dynamodb.GetState()
-		}
-		if err := persist.Save(state); err != nil {
-			return err
+		if err := persist.Save(stateToSave); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to save state: %v\n", err)
+		} else {
+			printSuccess("State saved to ~/.clouddev/state.json")
 		}
 		printInfo("Shutting down...")
 		return nil
