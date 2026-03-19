@@ -15,6 +15,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/s3"
+	"github.com/clouddev/clouddev/internal/services/secretsmanager"
 	"github.com/clouddev/clouddev/internal/services/sqs"
 	"github.com/spf13/cobra"
 )
@@ -78,6 +79,12 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("API Gateway starting on port %d", cfg.Ports.APIGateway)
 		}
+		go func() {
+			if err := secretsmanager.Start(4584); err != nil {
+				fmt.Fprintf(os.Stderr, "Secrets Manager server error: %v\n", err)
+			}
+		}()
+		printSuccess("Secrets Manager server starting on port %d", 4584)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
