@@ -39,6 +39,18 @@ var detectCmd = &cobra.Command{
 			mergeServices(combined, cfResult.Services)
 		}
 
+		kubernetesFiles, err := filepath.Glob("*.y*ml")
+		if err != nil {
+			return err
+		}
+		if len(kubernetesFiles) > 0 {
+			kubernetesResult, err := iac.ParseKubernetes(".")
+			if err != nil {
+				return err
+			}
+			mergeServices(combined, kubernetesResult.Services)
+		}
+
 		enabled, err := updateCloudDevYAML("clouddev.yml", combined)
 		if err != nil {
 			return err
