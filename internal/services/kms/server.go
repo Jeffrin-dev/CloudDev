@@ -141,7 +141,16 @@ func (s *server) decrypt(w http.ResponseWriter, payload map[string]any) {
 		writeError(w, http.StatusBadRequest, "InvalidCiphertextException", "CiphertextBlob is invalid")
 		return
 	}
-	parts := strings.SplitN(string(decoded), ":", 2)
+	inner := string(decoded)
+	if !strings.Contains(inner, ":") {
+		decoded, err = base64.StdEncoding.DecodeString(inner)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidCiphertextException", "CiphertextBlob is invalid")
+			return
+		}
+		inner = string(decoded)
+	}
+	parts := strings.SplitN(inner, ":", 2)
 	if len(parts) != 2 {
 		writeError(w, http.StatusBadRequest, "InvalidCiphertextException", "CiphertextBlob is invalid")
 		return
