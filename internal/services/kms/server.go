@@ -125,6 +125,8 @@ func (s *server) encrypt(w http.ResponseWriter, payload map[string]any) {
 		writeError(w, http.StatusBadRequest, "ValidationException", "Plaintext is required")
 		return
 	}
+	encodedPlaintext := base64.StdEncoding.EncodeToString([]byte(plaintext))
+	ciphertext := base64.StdEncoding.EncodeToString([]byte(key.KeyId + ":" + encodedPlaintext))
 	ciphertext := base64.StdEncoding.EncodeToString([]byte(key.KeyId + ":" + plaintext))
 	writeJSON(w, http.StatusOK, map[string]any{"CiphertextBlob": ciphertext, "KeyId": key.KeyArn})
 }
@@ -146,11 +148,20 @@ func (s *server) decrypt(w http.ResponseWriter, payload map[string]any) {
 		return
 	}
 	keyID := parts[0]
+	encodedPlaintext := parts[1]
 
 	s.mu.RLock()
 	key, ok := s.keys[keyID]
 	s.mu.RUnlock()
 	if !ok {
+		writeError(w, http.StatusBadRequest, "InvalidCiphertextException", "CiphertextBlob is invalid")
+		return
+	}
+	if plaintext, err := base64.StdEncoding.DecodeString(encodedPlaintext); err == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"KeyId": key.KeyArn, "Plaintext": string(plaintext)})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"KeyId": key.KeyArn, "Plaintext": encodedPlaintext})
 		writeError(w, http.StatusBadRequest, "NotFoundException", "Key not found")
 		return
 	}
