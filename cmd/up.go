@@ -14,6 +14,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
+	"github.com/clouddev/clouddev/internal/services/iam"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
@@ -94,6 +95,12 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("CloudWatch Logs starting on port 4586")
 		}
+		go func() {
+			if err := iam.Start(4593); err != nil {
+				fmt.Fprintf(os.Stderr, "IAM server error: %v\n", err)
+			}
+		}()
+		printSuccess("IAM server starting on port %d", 4593)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
