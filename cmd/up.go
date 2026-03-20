@@ -15,6 +15,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/iam"
+	"github.com/clouddev/clouddev/internal/services/kms"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
@@ -108,6 +109,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("STS server starting on port %d", 4592)
+		go func() {
+			if err := kms.Start(4599); err != nil {
+				fmt.Fprintf(os.Stderr, "KMS server error: %v\n", err)
+			}
+		}()
+		printSuccess("KMS server starting on port %d", 4599)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
