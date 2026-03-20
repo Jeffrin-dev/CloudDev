@@ -17,11 +17,14 @@ const (
 )
 
 type Services struct {
-	S3         bool `yaml:"s3"`
-	DynamoDB   bool `yaml:"dynamodb"`
-	Lambda     bool `yaml:"lambda"`
-	SQS        bool `yaml:"sqs"`
-	APIGateway bool `yaml:"api_gateway"`
+	S3             bool `yaml:"s3"`
+	DynamoDB       bool `yaml:"dynamodb"`
+	Lambda         bool `yaml:"lambda"`
+	SQS            bool `yaml:"sqs"`
+	APIGateway     bool `yaml:"api_gateway"`
+	SNS            bool `yaml:"sns"`
+	SecretsManager bool `yaml:"secrets_manager"`
+	CloudWatchLogs bool `yaml:"cloudwatch_logs"`
 }
 
 type Ports struct {
@@ -44,7 +47,7 @@ type Config struct {
 }
 
 func (c Services) AnyEnabled() bool {
-	return c.S3 || c.DynamoDB || c.Lambda || c.SQS || c.APIGateway
+	return c.S3 || c.DynamoDB || c.Lambda || c.SQS || c.APIGateway || c.SNS || c.SecretsManager || c.CloudWatchLogs
 }
 
 func (c *Config) applyDefaultPorts() {
