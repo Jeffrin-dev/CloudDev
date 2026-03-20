@@ -19,6 +19,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
 	"github.com/clouddev/clouddev/internal/services/sqs"
+	"github.com/clouddev/clouddev/internal/services/sts"
 	"github.com/spf13/cobra"
 )
 
@@ -101,6 +102,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("IAM server starting on port %d", 4593)
+		go func() {
+			if err := sts.Start(4592); err != nil {
+				fmt.Fprintf(os.Stderr, "STS server error: %v\n", err)
+			}
+		}()
+		printSuccess("STS server starting on port %d", 4592)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
