@@ -127,7 +127,6 @@ func (s *server) encrypt(w http.ResponseWriter, payload map[string]any) {
 	}
 	encodedPlaintext := base64.StdEncoding.EncodeToString([]byte(plaintext))
 	ciphertext := base64.StdEncoding.EncodeToString([]byte(key.KeyId + ":" + encodedPlaintext))
-	ciphertext := base64.StdEncoding.EncodeToString([]byte(key.KeyId + ":" + plaintext))
 	writeJSON(w, http.StatusOK, map[string]any{"CiphertextBlob": ciphertext, "KeyId": key.KeyArn})
 }
 
