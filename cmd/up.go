@@ -12,7 +12,9 @@ import (
 	"github.com/clouddev/clouddev/internal/docker"
 	"github.com/clouddev/clouddev/internal/persist"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
+	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
+	"github.com/clouddev/clouddev/internal/services/iam"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
@@ -85,6 +87,20 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Secrets Manager server starting on port %d", 4584)
+		if true {
+			go func() {
+				if err := cloudwatchlogs.Start(4586); err != nil {
+					fmt.Fprintf(os.Stderr, "CloudWatch Logs error: %v\n", err)
+				}
+			}()
+			printSuccess("CloudWatch Logs starting on port 4586")
+		}
+		go func() {
+			if err := iam.Start(4593); err != nil {
+				fmt.Fprintf(os.Stderr, "IAM server error: %v\n", err)
+			}
+		}()
+		printSuccess("IAM server starting on port %d", 4593)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
