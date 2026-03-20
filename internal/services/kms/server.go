@@ -162,10 +162,6 @@ func (s *server) decrypt(w http.ResponseWriter, payload map[string]any) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"KeyId": key.KeyArn, "Plaintext": encodedPlaintext})
-		writeError(w, http.StatusBadRequest, "NotFoundException", "Key not found")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"KeyId": key.KeyArn, "Plaintext": parts[1]})
 }
 
 func (s *server) generateDataKey(w http.ResponseWriter, payload map[string]any) {
