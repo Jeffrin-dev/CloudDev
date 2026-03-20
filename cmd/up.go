@@ -12,6 +12,7 @@ import (
 	"github.com/clouddev/clouddev/internal/docker"
 	"github.com/clouddev/clouddev/internal/persist"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
+	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/iam"
@@ -115,6 +116,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("KMS server starting on port %d", 4599)
+		go func() {
+			if err := cloudformation.Start(4581); err != nil {
+				fmt.Fprintf(os.Stderr, "CloudFormation server error: %v\n", err)
+			}
+		}()
+		printSuccess("CloudFormation server starting on port %d", 4581)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
