@@ -29,13 +29,43 @@ We use Conventional Commits:
 - `chore:` — build/tooling changes
 - `test:` — adding or updating tests
 
-## Reporting Issues
+## Project Structure
+```
+clouddev/
+  cmd/              # CLI commands (init, up, down, status, detect, estimate)
+  internal/
+    config/         # clouddev.yml parser
+    costestimator/  # AWS cost estimation
+    dashboard/      # Web dashboard server
+    docker/         # Docker container manager
+    iac/            # IaC parser (Terraform, CloudFormation, Kubernetes)
+    persist/        # Data persistence
+    services/
+      apigateway/   # API Gateway emulation
+      cloudwatchlogs/ # CloudWatch Logs emulation
+      dynamodb/     # DynamoDB emulation
+      lambda/       # Lambda emulation with hot reload
+      s3/           # S3 emulation
+      secretsmanager/ # Secrets Manager emulation
+      sns/          # SNS emulation
+      sqs/          # SQS emulation
+  functions/        # User Lambda functions
+  infrastructure/   # IaC definitions
+```
 
-Please open a GitHub issue with:
-- A clear description of the problem
-- Steps to reproduce
-- Expected vs actual behaviour
-- Your OS and CloudDev version
+## Service Ports
+
+| Service | Port |
+|---|---|
+| S3 | 4566 |
+| DynamoDB | 4569 |
+| Lambda | 4574 |
+| SQS | 4576 |
+| API Gateway | 4572 |
+| SNS | 4575 |
+| Secrets Manager | 4584 |
+| CloudWatch Logs | 4586 |
+| Dashboard | 4580 |
 
 ## Development Setup
 
@@ -50,3 +80,24 @@ go mod tidy
 go build -o clouddev .
 ./clouddev --version
 ```
+
+## Running Tests
+```bash
+go test ./...
+```
+
+## Adding a New Service
+
+1. Create `internal/services/<servicename>/server.go`
+2. Implement `Start(port int) error`
+3. Wire into `cmd/up.go`
+4. Write tests in `internal/services/<servicename>/server_test.go`
+5. Update `README.md` with the new service and port
+
+## Reporting Issues
+
+Please open a GitHub issue with:
+- A clear description of the problem
+- Steps to reproduce
+- Expected vs actual behaviour
+- Your OS and CloudDev version
