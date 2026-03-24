@@ -14,6 +14,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
+	"github.com/clouddev/clouddev/internal/services/cognito"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/elasticache"
 	"github.com/clouddev/clouddev/internal/services/eventbridge"
@@ -143,6 +144,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("ElastiCache server starting on ports %d (redis) and %d (http)", 4598, 4597)
+		go func() {
+			if err := cognito.Start(4596); err != nil {
+				fmt.Fprintf(os.Stderr, "Cognito server error: %v\n", err)
+			}
+		}()
+		printSuccess("Cognito server starting on port %d", 4596)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
