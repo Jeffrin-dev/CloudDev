@@ -79,19 +79,19 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch target {
-	case "AmazonEventBridge.CreateEventBus":
+	case "AWSEvents.CreateEventBus", "AmazonEventBridge.CreateEventBus":
 		s.handleCreateEventBus(w, payload)
-	case "AmazonEventBridge.ListEventBuses":
+	case "AWSEvents.ListEventBuses", "AmazonEventBridge.ListEventBuses":
 		s.handleListEventBuses(w)
-	case "AmazonEventBridge.PutRule":
+	case "AWSEvents.PutRule", "AmazonEventBridge.PutRule":
 		s.handlePutRule(w, payload)
-	case "AmazonEventBridge.ListRules":
+	case "AWSEvents.ListRules", "AmazonEventBridge.ListRules":
 		s.handleListRules(w, payload)
-	case "AmazonEventBridge.PutTargets":
+	case "AWSEvents.PutTargets", "AmazonEventBridge.PutTargets":
 		s.handlePutTargets(w, payload)
-	case "AmazonEventBridge.PutEvents":
+	case "AWSEvents.PutEvents", "AmazonEventBridge.PutEvents":
 		s.handlePutEvents(w, payload)
-	case "AmazonEventBridge.DeleteRule":
+	case "AWSEvents.DeleteRule", "AmazonEventBridge.DeleteRule":
 		s.handleDeleteRule(w, payload)
 	default:
 		writeError(w, http.StatusBadRequest, "UnknownOperationException", "Unknown X-Amz-Target operation")
