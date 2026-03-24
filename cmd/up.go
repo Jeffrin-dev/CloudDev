@@ -15,6 +15,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
+	"github.com/clouddev/clouddev/internal/services/eventbridge"
 	"github.com/clouddev/clouddev/internal/services/iam"
 	"github.com/clouddev/clouddev/internal/services/kms"
 	"github.com/clouddev/clouddev/internal/services/lambda"
@@ -97,6 +98,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Step Functions server starting on port %d", 4585)
+		go func() {
+			if err := eventbridge.Start(4587, cfg.Ports.Lambda, cfg.Ports.SQS); err != nil {
+				fmt.Fprintf(os.Stderr, "EventBridge server error: %v\n", err)
+			}
+		}()
+		printSuccess("EventBridge server starting on port %d", 4587)
 		if true {
 			go func() {
 				if err := cloudwatchlogs.Start(4586); err != nil {
