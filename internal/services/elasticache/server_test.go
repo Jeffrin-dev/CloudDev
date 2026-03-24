@@ -2,12 +2,12 @@ package elasticache
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -98,50 +98,47 @@ func TestRedisSetGetRoundTrip(t *testing.T) {
 func TestHTTPCreateAndDescribeCacheClusters(t *testing.T) {
 	srv := newServer()
 
-	createResp := performJSONRequest(t, srv, "AmazonElastiCache.CreateCacheCluster", map[string]any{
+	createBody := performFormRequest(t, srv, map[string]string{
+		"Action":         "CreateCacheCluster",
+		"Version":        "2015-02-02",
 		"CacheClusterId": "cluster-1",
 		"Engine":         "redis",
-		"EngineVersion":  "7.0",
-		"NumCacheNodes":  1,
+		"NumCacheNodes":  "1",
 	})
-	cluster := createResp["CacheCluster"].(map[string]any)
-	if cluster["CacheClusterId"] != "cluster-1" {
-		t.Fatalf("expected cluster-1, got %v", cluster["CacheClusterId"])
+	if !strings.Contains(createBody, "<CacheClusterId>cluster-1</CacheClusterId>") {
+		t.Fatalf("expected cluster id in create response, got %s", createBody)
 	}
 
-	describeResp := performJSONRequest(t, srv, "AmazonElastiCache.DescribeCacheClusters", map[string]any{})
-	clusters := describeResp["CacheClusters"].([]any)
-	if len(clusters) != 1 {
-		t.Fatalf("expected 1 cluster, got %d", len(clusters))
-	}
-	described := clusters[0].(map[string]any)
-	if described["CacheClusterId"] != "cluster-1" {
-		t.Fatalf("expected cluster-1, got %v", described["CacheClusterId"])
+	describeBody := performFormRequest(t, srv, map[string]string{
+		"Action":  "DescribeCacheClusters",
+		"Version": "2015-02-02",
+	})
+	if !strings.Contains(describeBody, "<CacheClusterId>cluster-1</CacheClusterId>") {
+		t.Fatalf("expected cluster id in describe response, got %s", describeBody)
 	}
 }
 
-func performJSONRequest(t *testing.T, handler http.Handler, target string, payload map[string]any) map[string]any {
+func performFormRequest(t *testing.T, handler http.Handler, payload map[string]string) string {
 	t.Helper()
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
+	form := url.Values{}
+	for key, value := range payload {
+		form.Set(key, value)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
-	req.Header.Set("X-Amz-Target", target)
-	req.Header.Set("Content-Type", jsonContentType)
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200 OK, got %d with body %s", rec.Code, rec.Body.String())
 	}
-	if got := rec.Header().Get("Content-Type"); got != jsonContentType {
-		t.Fatalf("expected content type %s, got %s", jsonContentType, got)
+	if got := rec.Header().Get("Content-Type"); got != xmlContentType {
+		t.Fatalf("expected content type %s, got %s", xmlContentType, got)
 	}
-	var resp map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
+	body, err := io.ReadAll(rec.Body)
+	if err != nil {
+		t.Fatalf("read response: %v", err)
 	}
-	return resp
+	return string(body)
 }
 
 func respCommand(parts ...string) string {

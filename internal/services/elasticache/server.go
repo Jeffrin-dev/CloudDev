@@ -2,7 +2,6 @@ package elasticache
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -14,7 +13,7 @@ import (
 	"time"
 )
 
-const jsonContentType = "application/x-amz-json-1.1"
+const xmlContentType = "text/xml"
 
 type CacheCluster struct {
 	CacheClusterId     string `json:"CacheClusterId"`
@@ -290,101 +289,84 @@ func matchesPattern(pattern, key string) bool {
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"__type":"InvalidAction","message":"Only POST is supported"}`, http.StatusMethodNotAllowed)
+		writeError(w, "InvalidAction", "Only POST is supported")
 		return
 	}
 
-	target := r.Header.Get("X-Amz-Target")
-	w.Header().Set("Content-Type", jsonContentType)
+	if err := r.ParseForm(); err != nil {
+		writeError(w, "InvalidParameterValue", "Could not parse form body")
+		return
+	}
 
-	switch target {
-	case "AmazonElastiCache.CreateCacheCluster":
+	action := r.FormValue("Action")
+	switch action {
+	case "CreateCacheCluster":
 		s.createCacheCluster(w, r)
-	case "AmazonElastiCache.DeleteCacheCluster":
+	case "DeleteCacheCluster":
 		s.deleteCacheCluster(w, r)
-	case "AmazonElastiCache.DescribeCacheClusters":
+	case "DescribeCacheClusters":
 		s.describeCacheClusters(w)
 	default:
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"__type":  "InvalidAction",
-			"message": "Unknown X-Amz-Target",
-		})
+		writeError(w, "InvalidAction", "Unknown or missing Action")
 	}
 }
 
 func (s *server) createCacheCluster(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		CacheClusterId string
-		Engine         string
-		EngineVersion  string
-		NumCacheNodes  int
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "invalid JSON body"})
+	cacheClusterID := r.FormValue("CacheClusterId")
+	if cacheClusterID == "" {
+		writeError(w, "MissingParameter", "CacheClusterId is required")
 		return
-	}
-	if req.CacheClusterId == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "CacheClusterId is required"})
-		return
-	}
-	if req.Engine == "" {
-		req.Engine = "redis"
-	}
-	if req.EngineVersion == "" {
-		req.EngineVersion = "7.x"
-	}
-	if req.NumCacheNodes == 0 {
-		req.NumCacheNodes = 1
 	}
 
+	engine := r.FormValue("Engine")
+	if engine == "" {
+		engine = "redis"
+	}
+
+	numCacheNodes := 1
+	numCacheNodesValue := r.FormValue("NumCacheNodes")
+	if numCacheNodesValue != "" {
+		parsed, err := strconv.Atoi(numCacheNodesValue)
+		if err != nil || parsed <= 0 {
+			writeError(w, "InvalidParameterValue", "NumCacheNodes must be a positive integer")
+			return
+		}
+		numCacheNodes = parsed
+	}
 	cluster := CacheCluster{
-		CacheClusterId:     req.CacheClusterId,
+		CacheClusterId:     cacheClusterID,
 		CacheClusterStatus: "available",
-		Engine:             req.Engine,
-		EngineVersion:      req.EngineVersion,
-		NumCacheNodes:      req.NumCacheNodes,
+		Engine:             engine,
+		NumCacheNodes:      numCacheNodes,
 	}
 
 	s.mu.Lock()
 	s.clusters[cluster.CacheClusterId] = cluster
 	s.mu.Unlock()
 
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]CacheCluster{"CacheCluster": cluster})
+	writeXML(w, fmt.Sprintf("<CreateCacheClusterResponse><CreateCacheClusterResult><CacheCluster><CacheClusterId>%s</CacheClusterId><CacheClusterStatus>%s</CacheClusterStatus><Engine>%s</Engine><NumCacheNodes>%d</NumCacheNodes></CacheCluster></CreateCacheClusterResult></CreateCacheClusterResponse>", cluster.CacheClusterId, cluster.CacheClusterStatus, cluster.Engine, cluster.NumCacheNodes))
 }
 
 func (s *server) deleteCacheCluster(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		CacheClusterId string
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "invalid JSON body"})
+	cacheClusterID := r.FormValue("CacheClusterId")
+	if cacheClusterID == "" {
+		writeError(w, "MissingParameter", "CacheClusterId is required")
 		return
 	}
 
 	s.mu.Lock()
-	_, exists := s.clusters[req.CacheClusterId]
+	_, exists := s.clusters[cacheClusterID]
 	if exists {
-		delete(s.clusters, req.CacheClusterId)
+		delete(s.clusters, cacheClusterID)
 	}
 	s.mu.Unlock()
 
-	status := "deleted"
 	if !exists {
-		status = "not-found"
+		writeError(w, "CacheClusterNotFound", "CacheCluster not found")
+		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]CacheCluster{
-		"CacheCluster": {
-			CacheClusterId:     req.CacheClusterId,
-			CacheClusterStatus: status,
-		},
-	})
+	writeXML(w, fmt.Sprintf("<DeleteCacheClusterResponse><DeleteCacheClusterResult><CacheCluster><CacheClusterId>%s</CacheClusterId><CacheClusterStatus>deleted</CacheClusterStatus></CacheCluster></DeleteCacheClusterResult></DeleteCacheClusterResponse>", cacheClusterID))
 }
 
 func (s *server) describeCacheClusters(w http.ResponseWriter) {
@@ -399,6 +381,19 @@ func (s *server) describeCacheClusters(w http.ResponseWriter) {
 		return clusters[i].CacheClusterId < clusters[j].CacheClusterId
 	})
 
+	result := ""
+	for _, cluster := range clusters {
+		result += fmt.Sprintf("<CacheCluster><CacheClusterId>%s</CacheClusterId><CacheClusterStatus>%s</CacheClusterStatus><Engine>%s</Engine><NumCacheNodes>%d</NumCacheNodes></CacheCluster>", cluster.CacheClusterId, cluster.CacheClusterStatus, cluster.Engine, cluster.NumCacheNodes)
+	}
+	writeXML(w, fmt.Sprintf("<DescribeCacheClustersResponse><DescribeCacheClustersResult>%s</DescribeCacheClustersResult></DescribeCacheClustersResponse>", result))
+}
+
+func writeXML(w http.ResponseWriter, body string) {
+	w.Header().Set("Content-Type", xmlContentType)
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"CacheClusters": clusters})
+	_, _ = w.Write([]byte("<?xml version=\"1.0\"?>" + body))
+}
+
+func writeError(w http.ResponseWriter, code, message string) {
+	writeXML(w, fmt.Sprintf("<ErrorResponse><Error><Type>Sender</Type><Code>%s</Code><Message>%s</Message></Error><RequestId>req-error</RequestId></ErrorResponse>", code, message))
 }
