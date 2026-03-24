@@ -1,103 +1,177 @@
 # Contributing to CloudDev
 
-Thank you for your interest in contributing! CloudDev is an 
-open-source project and all contributions are welcome.
+Thank you for your interest in contributing to CloudDev! This document will help you get started.
 
-## Getting Started
+---
 
-1. Fork the repository
-2. Clone your fork:
-   `git clone https://github.com/YOUR_USERNAME/CloudDev`
-3. Create a feature branch:
-   `git checkout -b feature/my-feature`
-4. Make your changes
-5. Build and test:
-   `go build -o clouddev . && go test ./...`
-6. Commit:
-   `git commit -m "feat: describe your change"`
-7. Push:
-   `git push origin feature/my-feature`
-8. Open a Pull Request
+## 🧭 Ways to Contribute
 
-## Commit Message Convention
+- **Bug fixes** — fix issues in existing service emulators
+- **New services** — add missing AWS services
+- **Improve parity** — make existing emulators more AWS-compatible
+- **Tests** — add missing test coverage
+- **Documentation** — improve README, comments, or examples
+- **Dashboard** — improve the web UI
 
-We use Conventional Commits:
+---
 
-- `feat:` — new feature
-- `fix:` — bug fix
-- `docs:` — documentation only
-- `chore:` — build/tooling changes
-- `test:` — adding or updating tests
+## 🛠️ Development Setup
 
-## Project Structure
-```
-clouddev/
-  cmd/              # CLI commands (init, up, down, status, detect, estimate)
-  internal/
-    config/         # clouddev.yml parser
-    costestimator/  # AWS cost estimation
-    dashboard/      # Web dashboard server
-    docker/         # Docker container manager
-    iac/            # IaC parser (Terraform, CloudFormation, Kubernetes)
-    persist/        # Data persistence
-    services/
-      apigateway/   # API Gateway emulation
-      cloudwatchlogs/ # CloudWatch Logs emulation
-      dynamodb/     # DynamoDB emulation
-      lambda/       # Lambda emulation with hot reload
-      s3/           # S3 emulation
-      secretsmanager/ # Secrets Manager emulation
-      sns/          # SNS emulation
-      sqs/          # SQS emulation
-  functions/        # User Lambda functions
-  infrastructure/   # IaC definitions
-```
+### Prerequisites
 
-## Service Ports
-
-| Service | Port |
-|---|---|
-| S3 | 4566 |
-| DynamoDB | 4569 |
-| Lambda | 4574 |
-| SQS | 4576 |
-| API Gateway | 4572 |
-| SNS | 4575 |
-| Secrets Manager | 4584 |
-| CloudWatch Logs | 4586 |
-| Dashboard | 4580 |
-
-## Development Setup
-
-Requirements:
 - Go 1.22+
-- Docker
-- AWS CLI (for testing)
+- Git
+- AWS CLI (for live testing)
+- `redis-cli` (for ElastiCache testing)
+
+### Clone and Build
+
 ```bash
-git clone https://github.com/Jeffrin-dev/CloudDev
+git clone https://github.com/Jeffrin-dev/CloudDev.git
 cd CloudDev
-go mod tidy
 go build -o clouddev .
-./clouddev --version
+go test ./...
 ```
 
-## Running Tests
+---
+
+## 📁 Project Structure
+
+Each AWS service lives in its own package under `internal/services/`:
+
+```
+internal/services/
+└── myservice/
+    ├── server.go       # Service implementation
+    └── server_test.go  # Tests
+```
+
+Every service must expose:
+
+```go
+func Start(port int) error
+```
+
+And be wired into `cmd/up.go`.
+
+---
+
+## 🧱 Adding a New Service
+
+1. Create `internal/services/myservice/server.go`
+2. Implement `Start(port int) error`
+3. Add HTTP handler with correct protocol:
+   - **JSON + X-Amz-Target** (KMS, Step Functions, EventBridge, Cognito, ElastiCache HTTP)
+   - **Form-encoded + Action** (IAM, STS, CloudFormation, SQS, SNS, ElastiCache)
+   - **REST** (S3, DynamoDB, Lambda)
+4. Wire into `cmd/up.go`
+5. Add tests in `server_test.go`
+6. Update the dashboard service list in `internal/dashboard/server.go`
+
+### Protocol Reference
+
+| Service Type | Content-Type | Dispatch |
+|---|---|---|
+| JSON services | `application/x-amz-json-1.1` | `X-Amz-Target` header |
+| Query services | `application/x-www-form-urlencoded` | `Action` form field |
+| REST services | varies | HTTP method + path |
+
+---
+
+## ✅ Testing Guidelines
+
+Every service must have tests covering:
+- Happy path (basic create/list/describe)
+- Error cases (not found, invalid input)
+- Roundtrip operations (e.g. encrypt/decrypt, put/get)
+
+Run tests:
+
 ```bash
 go test ./...
 ```
 
-## Adding a New Service
+Run tests for a specific service:
 
-1. Create `internal/services/<servicename>/server.go`
-2. Implement `Start(port int) error`
-3. Wire into `cmd/up.go`
-4. Write tests in `internal/services/<servicename>/server_test.go`
-5. Update `README.md` with the new service and port
+```bash
+go test ./internal/services/kms/...
+```
 
-## Reporting Issues
+---
+
+## 🔍 Live Testing
+
+Always live test before submitting a PR:
+
+```bash
+./clouddev init test-app
+cd test-app
+../clouddev up &
+sleep 3
+
+# Run your AWS CLI tests here
+
+kill %1 2>/dev/null
+fuser -k 4566/tcp 4569/tcp ... 2>/dev/null
+cd ..
+rm -rf test-app
+rm -f ~/.clouddev/state.json
+```
+
+---
+
+## 📝 Pull Request Guidelines
+
+- **One service per PR** — keep PRs focused
+- **All tests must pass** — `go build ./...` and `go test ./...`
+- **No new variables on left side of :=** — common Go mistake, double check
+- **Match existing code style** — run `gofmt -w .` before committing
+- **Update dashboard** — if adding a new service, add it to the dashboard service list
+- **Descriptive commit messages** — e.g. `feat(kms): add KMS encrypt/decrypt`
+
+---
+
+## 🐛 Reporting Bugs
 
 Please open a GitHub issue with:
-- A clear description of the problem
+- CloudDev version (`./clouddev --version`)
+- Go version (`go version`)
+- OS and architecture
+- AWS CLI version (`aws --version`)
 - Steps to reproduce
-- Expected vs actual behaviour
-- Your OS and CloudDev version
+- Expected vs actual behavior
+
+---
+
+## 💡 Feature Requests
+
+Open a GitHub issue with:
+- The AWS service or feature you need
+- Your use case
+- Any relevant AWS documentation links
+
+---
+
+## 🏷️ Commit Message Format
+
+```
+type(scope): short description
+
+Types: feat, fix, test, docs, refactor, chore
+Scope: service name (s3, kms, cognito, dashboard, etc.)
+
+Examples:
+feat(kms): add GenerateDataKey operation
+fix(stepfunctions): correct X-Amz-Target prefix
+docs(readme): add ElastiCache usage example
+```
+
+---
+
+## 📄 License
+
+By contributing to CloudDev, you agree that your contributions will be licensed under the Apache 2.0 License.
+
+---
+
+Thank you for helping make CloudDev better! 🙏
