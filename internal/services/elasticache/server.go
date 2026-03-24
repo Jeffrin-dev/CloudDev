@@ -385,7 +385,7 @@ func (s *server) describeCacheClusters(w http.ResponseWriter) {
 	for _, cluster := range clusters {
 		result += fmt.Sprintf("<CacheCluster><CacheClusterId>%s</CacheClusterId><CacheClusterStatus>%s</CacheClusterStatus><Engine>%s</Engine><NumCacheNodes>%d</NumCacheNodes></CacheCluster>", cluster.CacheClusterId, cluster.CacheClusterStatus, cluster.Engine, cluster.NumCacheNodes)
 	}
-	writeXML(w, fmt.Sprintf("<DescribeCacheClustersResponse><DescribeCacheClustersResult>%s</DescribeCacheClustersResult></DescribeCacheClustersResponse>", result))
+	writeXML(w, fmt.Sprintf("<DescribeCacheClustersResponse><DescribeCacheClustersResult><CacheClusters>%s</CacheClusters></DescribeCacheClustersResult></DescribeCacheClustersResponse>", result))
 }
 
 func writeXML(w http.ResponseWriter, body string) {
