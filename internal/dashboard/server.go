@@ -145,7 +145,19 @@ const dashboardHTML = `<!DOCTYPE html>
       dynamodb: 'DynamoDB',
       lambda: 'Lambda',
       sqs: 'SQS',
-      api_gateway: 'API Gateway'
+      api_gateway: 'API Gateway',
+      sns: 'SNS',
+      secrets_manager: 'Secrets Manager',
+      cloudwatch_logs: 'CloudWatch Logs',
+      iam: 'IAM',
+      sts: 'STS',
+      kms: 'KMS',
+      cloudformation: 'CloudFormation',
+      step_functions: 'Step Functions',
+      eventbridge: 'EventBridge',
+      elasticache: 'ElastiCache',
+      elasticache_http: 'ElastiCache HTTP',
+      cognito: 'Cognito'
     };
 
     async function refreshStatus() {
@@ -158,7 +170,25 @@ const dashboardHTML = `<!DOCTYPE html>
         const tbody = document.getElementById('status-body');
         tbody.innerHTML = '';
 
-        const order = ['s3', 'dynamodb', 'lambda', 'sqs', 'api_gateway'];
+        const order = [
+          's3',
+          'dynamodb',
+          'lambda',
+          'sqs',
+          'api_gateway',
+          'sns',
+          'secrets_manager',
+          'cloudwatch_logs',
+          'iam',
+          'sts',
+          'kms',
+          'cloudformation',
+          'step_functions',
+          'eventbridge',
+          'elasticache',
+          'elasticache_http',
+          'cognito'
+        ];
         order.forEach((key) => {
           const svc = data.services[key];
           if (!svc) return;
@@ -166,10 +196,11 @@ const dashboardHTML = `<!DOCTYPE html>
           const tr = document.createElement('tr');
           const statusClass = svc.running ? 'running' : 'stopped';
           const statusText = svc.running ? 'Running' : 'Stopped';
+          const statusDot = svc.running ? '🟢' : '🔴';
           tr.innerHTML = ` + "`" + `
             <td>${labels[key] || key}</td>
             <td>${svc.port}</td>
-            <td class="${statusClass}">${statusText}</td>
+            <td class="${statusClass}">${statusDot} ${statusText}</td>
           ` + "`" + `;
           tbody.appendChild(tr);
         });
