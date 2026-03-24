@@ -21,6 +21,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
 	"github.com/clouddev/clouddev/internal/services/sqs"
+	"github.com/clouddev/clouddev/internal/services/stepfunctions"
 	"github.com/clouddev/clouddev/internal/services/sts"
 	"github.com/spf13/cobra"
 )
@@ -90,6 +91,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Secrets Manager server starting on port %d", 4584)
+		go func() {
+			if err := stepfunctions.Start(4585); err != nil {
+				fmt.Fprintf(os.Stderr, "Step Functions server error: %v\n", err)
+			}
+		}()
+		printSuccess("Step Functions server starting on port %d", 4585)
 		if true {
 			go func() {
 				if err := cloudwatchlogs.Start(4586); err != nil {
