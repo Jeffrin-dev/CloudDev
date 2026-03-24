@@ -67,21 +67,21 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch target {
-	case "AmazonStates.CreateStateMachine":
+	case "AWSStepFunctions.CreateStateMachine", "AmazonStates.CreateStateMachine":
 		s.handleCreateStateMachine(w, payload)
-	case "AmazonStates.DeleteStateMachine":
+	case "AWSStepFunctions.DeleteStateMachine", "AmazonStates.DeleteStateMachine":
 		s.handleDeleteStateMachine(w, payload)
-	case "AmazonStates.ListStateMachines":
+	case "AWSStepFunctions.ListStateMachines", "AmazonStates.ListStateMachines":
 		s.handleListStateMachines(w)
-	case "AmazonStates.DescribeStateMachine":
+	case "AWSStepFunctions.DescribeStateMachine", "AmazonStates.DescribeStateMachine":
 		s.handleDescribeStateMachine(w, payload)
-	case "AmazonStates.StartExecution":
+	case "AWSStepFunctions.StartExecution", "AmazonStates.StartExecution":
 		s.handleStartExecution(w, payload)
-	case "AmazonStates.StopExecution":
+	case "AWSStepFunctions.StopExecution", "AmazonStates.StopExecution":
 		s.handleStopExecution(w, payload)
-	case "AmazonStates.ListExecutions":
+	case "AWSStepFunctions.ListExecutions", "AmazonStates.ListExecutions":
 		s.handleListExecutions(w, payload)
-	case "AmazonStates.DescribeExecution":
+	case "AWSStepFunctions.DescribeExecution", "AmazonStates.DescribeExecution":
 		s.handleDescribeExecution(w, payload)
 	default:
 		writeError(w, http.StatusBadRequest, "UnknownOperationException", "Unknown X-Amz-Target operation")
