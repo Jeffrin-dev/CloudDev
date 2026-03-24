@@ -173,11 +173,23 @@ var upCmd = &cobra.Command{
 		}
 		go func() {
 			serviceMap := map[string]int{
-				"s3":          cfg.Ports.S3,
-				"dynamodb":    cfg.Ports.DynamoDB,
-				"lambda":      cfg.Ports.Lambda,
-				"sqs":         cfg.Ports.SQS,
-				"api_gateway": cfg.Ports.APIGateway,
+				"s3":               cfg.Ports.S3,
+				"dynamodb":         cfg.Ports.DynamoDB,
+				"lambda":           cfg.Ports.Lambda,
+				"sqs":              cfg.Ports.SQS,
+				"api_gateway":      cfg.Ports.APIGateway,
+				"sns":              4575,
+				"secrets_manager":  4584,
+				"cloudwatch_logs":  4586,
+				"iam":              4593,
+				"sts":              4592,
+				"kms":              4599,
+				"cloudformation":   4581,
+				"step_functions":   4585,
+				"eventbridge":      4587,
+				"elasticache":      4598,
+				"elasticache_http": 4597,
+				"cognito":          4596,
 			}
 			if err := dashboard.Start(4580, serviceMap); err != nil {
 				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
