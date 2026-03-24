@@ -15,6 +15,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
+	"github.com/clouddev/clouddev/internal/services/elasticache"
 	"github.com/clouddev/clouddev/internal/services/eventbridge"
 	"github.com/clouddev/clouddev/internal/services/iam"
 	"github.com/clouddev/clouddev/internal/services/kms"
@@ -136,6 +137,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("CloudFormation server starting on port %d", 4581)
+		go func() {
+			if err := elasticache.Start(4598, 4597); err != nil {
+				fmt.Fprintf(os.Stderr, "ElastiCache server error: %v\n", err)
+			}
+		}()
+		printSuccess("ElastiCache server starting on ports %d (redis) and %d (http)", 4598, 4597)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
