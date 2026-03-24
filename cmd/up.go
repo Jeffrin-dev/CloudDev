@@ -14,6 +14,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
+	"github.com/clouddev/clouddev/internal/services/cloudwatchmetrics"
 	"github.com/clouddev/clouddev/internal/services/cognito"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/elasticache"
@@ -114,6 +115,14 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("CloudWatch Logs starting on port 4586")
 		}
+		if true {
+			go func() {
+				if err := cloudwatchmetrics.Start(4582); err != nil {
+					fmt.Fprintf(os.Stderr, "CloudWatch Metrics error: %v\n", err)
+				}
+			}()
+			printSuccess("CloudWatch Metrics starting on port 4582")
+		}
 		go func() {
 			if err := iam.Start(4593); err != nil {
 				fmt.Fprintf(os.Stderr, "IAM server error: %v\n", err)
@@ -173,23 +182,24 @@ var upCmd = &cobra.Command{
 		}
 		go func() {
 			serviceMap := map[string]int{
-				"s3":               cfg.Ports.S3,
-				"dynamodb":         cfg.Ports.DynamoDB,
-				"lambda":           cfg.Ports.Lambda,
-				"sqs":              cfg.Ports.SQS,
-				"api_gateway":      cfg.Ports.APIGateway,
-				"sns":              4575,
-				"secrets_manager":  4584,
-				"cloudwatch_logs":  4586,
-				"iam":              4593,
-				"sts":              4592,
-				"kms":              4599,
-				"cloudformation":   4581,
-				"step_functions":   4585,
-				"eventbridge":      4587,
-				"elasticache":      4598,
-				"elasticache_http": 4597,
-				"cognito":          4596,
+				"s3":                 cfg.Ports.S3,
+				"dynamodb":           cfg.Ports.DynamoDB,
+				"lambda":             cfg.Ports.Lambda,
+				"sqs":                cfg.Ports.SQS,
+				"api_gateway":        cfg.Ports.APIGateway,
+				"sns":                4575,
+				"secrets_manager":    4584,
+				"cloudwatch_logs":    4586,
+				"cloudwatch_metrics": 4582,
+				"iam":                4593,
+				"sts":                4592,
+				"kms":                4599,
+				"cloudformation":     4581,
+				"step_functions":     4585,
+				"eventbridge":        4587,
+				"elasticache":        4598,
+				"elasticache_http":   4597,
+				"cognito":            4596,
 			}
 			if err := dashboard.Start(4580, serviceMap); err != nil {
 				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
