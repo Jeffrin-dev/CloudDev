@@ -22,6 +22,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/iam"
 	"github.com/clouddev/clouddev/internal/services/kms"
 	"github.com/clouddev/clouddev/internal/services/lambda"
+	"github.com/clouddev/clouddev/internal/services/lambdalayers"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
 	"github.com/clouddev/clouddev/internal/services/sqs"
@@ -73,6 +74,12 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("Lambda server starting on port %d", cfg.Ports.Lambda)
 		}
+		go func() {
+			if err := lambdalayers.Start(4578); err != nil {
+				fmt.Fprintf(os.Stderr, "Lambda Layers server error: %v\n", err)
+			}
+		}()
+		printSuccess("Lambda Layers server starting on port %d", 4578)
 		if cfg.Services.SQS {
 			go func() {
 				if err := sqs.Start(cfg.Ports.SQS); err != nil {
@@ -185,6 +192,7 @@ var upCmd = &cobra.Command{
 				"s3":                 cfg.Ports.S3,
 				"dynamodb":           cfg.Ports.DynamoDB,
 				"lambda":             cfg.Ports.Lambda,
+				"lambda_layers":      4578,
 				"sqs":                cfg.Ports.SQS,
 				"api_gateway":        cfg.Ports.APIGateway,
 				"sns":                4575,
