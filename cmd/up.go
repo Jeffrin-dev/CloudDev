@@ -23,6 +23,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/kms"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/lambdalayers"
+	"github.com/clouddev/clouddev/internal/services/rekognition"
 	"github.com/clouddev/clouddev/internal/services/route53"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
@@ -187,6 +188,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Cognito server starting on port %d", 4596)
+		go func() {
+			if err := rekognition.Start(4594); err != nil {
+				fmt.Fprintf(os.Stderr, "Rekognition server error: %v\n", err)
+			}
+		}()
+		printSuccess("Rekognition server starting on port %d", 4594)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
@@ -232,6 +239,7 @@ var upCmd = &cobra.Command{
 				"elasticache":        4598,
 				"elasticache_http":   4597,
 				"cognito":            4596,
+				"rekognition":        4594,
 			}
 			if err := dashboard.Start(4580, serviceMap); err != nil {
 				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
