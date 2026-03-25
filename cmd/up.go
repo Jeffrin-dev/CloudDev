@@ -23,6 +23,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/kms"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/lambdalayers"
+	"github.com/clouddev/clouddev/internal/services/route53"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
 	"github.com/clouddev/clouddev/internal/services/sqs"
@@ -121,6 +122,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("X-Ray server starting on port %d", 4588)
+		go func() {
+			if err := route53.Start(4589); err != nil {
+				fmt.Fprintf(os.Stderr, "Route53 server error: %v\n", err)
+			}
+		}()
+		printSuccess("Route53 server starting on port %d", 4589)
 		if true {
 			go func() {
 				if err := cloudwatchlogs.Start(4586); err != nil {
@@ -213,6 +220,7 @@ var upCmd = &cobra.Command{
 				"step_functions":     4585,
 				"eventbridge":        4587,
 				"xray":               4588,
+				"route53":            4589,
 				"elasticache":        4598,
 				"elasticache_http":   4597,
 				"cognito":            4596,
