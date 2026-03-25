@@ -27,6 +27,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
 	"github.com/clouddev/clouddev/internal/services/sqs"
+	"github.com/clouddev/clouddev/internal/services/ssm"
 	"github.com/clouddev/clouddev/internal/services/stepfunctions"
 	"github.com/clouddev/clouddev/internal/services/sts"
 	"github.com/clouddev/clouddev/internal/services/xray"
@@ -104,6 +105,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Secrets Manager server starting on port %d", 4584)
+		go func() {
+			if err := ssm.Start(4583); err != nil {
+				fmt.Fprintf(os.Stderr, "SSM server error: %v\n", err)
+			}
+		}()
+		printSuccess("SSM server starting on port %d", 4583)
 		go func() {
 			if err := stepfunctions.Start(4585); err != nil {
 				fmt.Fprintf(os.Stderr, "Step Functions server error: %v\n", err)
@@ -211,6 +218,7 @@ var upCmd = &cobra.Command{
 				"api_gateway":        cfg.Ports.APIGateway,
 				"sns":                4575,
 				"secrets_manager":    4584,
+				"ssm":                4583,
 				"cloudwatch_logs":    4586,
 				"cloudwatch_metrics": 4582,
 				"iam":                4593,
