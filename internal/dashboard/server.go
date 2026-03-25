@@ -110,12 +110,16 @@ const dashboardHTML = `<!DOCTYPE html>
     header { background: #111827; color: #ffffff; padding: 20px 24px; }
     header h1 { margin: 0; font-size: 24px; }
     main { max-width: 900px; margin: 24px auto; padding: 0 16px; }
-    .card { background: #ffffff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 16px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e5e7eb; }
-    th { font-size: 14px; color: #374151; }
-    .running { color: #16a34a; font-weight: bold; }
-    .stopped { color: #dc2626; font-weight: bold; }
+    .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .service-card { background: #ffffff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 14px; border: 1px solid #e5e7eb; }
+    .service-name { font-weight: 700; margin-bottom: 8px; }
+    .service-meta { font-size: 14px; color: #374151; margin-bottom: 6px; }
+    .service-status { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+    .status-dot { width: 10px; height: 10px; border-radius: 9999px; display: inline-block; }
+    .running .status-dot { background: #16a34a; }
+    .stopped .status-dot { background: #dc2626; }
+    .running .status-text { color: #16a34a; }
+    .stopped .status-text { color: #dc2626; }
     .muted { color: #6b7280; font-size: 13px; margin-top: 10px; }
   </style>
 </head>
@@ -124,19 +128,8 @@ const dashboardHTML = `<!DOCTYPE html>
     <h1>☁️ CloudDev Dashboard</h1>
   </header>
   <main>
-    <div class="card">
-      <table>
-        <thead>
-          <tr>
-            <th>Service</th>
-            <th>Port</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="status-body"></tbody>
-      </table>
-      <div class="muted">Auto-refresh every 5 seconds</div>
-    </div>
+    <div id="status-grid" class="status-grid"></div>
+    <div class="muted">Auto-refresh every 5 seconds</div>
   </main>
 
   <script>
@@ -149,15 +142,21 @@ const dashboardHTML = `<!DOCTYPE html>
       sns: 'SNS',
       secrets_manager: 'Secrets Manager',
       cloudwatch_logs: 'CloudWatch Logs',
+      cloudwatch_metrics: 'CloudWatch Metrics',
       iam: 'IAM',
       sts: 'STS',
       kms: 'KMS',
       cloudformation: 'CloudFormation',
       step_functions: 'Step Functions',
       eventbridge: 'EventBridge',
+      xray: 'X-Ray',
+      route53: 'Route53',
       elasticache: 'ElastiCache',
       elasticache_http: 'ElastiCache HTTP',
-      cognito: 'Cognito'
+      cognito: 'Cognito',
+      lambda_layers: 'Lambda Layers',
+      ssm: 'SSM Parameter Store',
+      rekognition: 'Rekognition'
     };
 
     async function refreshStatus() {
@@ -167,8 +166,8 @@ const dashboardHTML = `<!DOCTYPE html>
           return;
         }
         const data = await res.json();
-        const tbody = document.getElementById('status-body');
-        tbody.innerHTML = '';
+        const grid = document.getElementById('status-grid');
+        grid.innerHTML = '';
 
         const order = [
           's3',
@@ -178,31 +177,40 @@ const dashboardHTML = `<!DOCTYPE html>
           'api_gateway',
           'sns',
           'secrets_manager',
+          'ssm',
           'cloudwatch_logs',
+          'cloudwatch_metrics',
           'iam',
           'sts',
           'kms',
           'cloudformation',
           'step_functions',
           'eventbridge',
+          'xray',
+          'route53',
           'elasticache',
           'elasticache_http',
-          'cognito'
+          'cognito',
+          'lambda_layers',
+          'rekognition'
         ];
         order.forEach((key) => {
           const svc = data.services[key];
           if (!svc) return;
 
-          const tr = document.createElement('tr');
+          const card = document.createElement('div');
+          card.className = 'service-card';
           const statusClass = svc.running ? 'running' : 'stopped';
           const statusText = svc.running ? 'Running' : 'Stopped';
-          const statusDot = svc.running ? '🟢' : '🔴';
-          tr.innerHTML = ` + "`" + `
-            <td>${labels[key] || key}</td>
-            <td>${svc.port}</td>
-            <td class="${statusClass}">${statusDot} ${statusText}</td>
+          card.innerHTML = ` + "`" + `
+            <div class="service-name">${labels[key] || key}</div>
+            <div class="service-meta">Port: ${svc.port}</div>
+            <div class="service-status ${statusClass}">
+              <span class="status-dot"></span>
+              <span class="status-text">${statusText}</span>
+            </div>
           ` + "`" + `;
-          tbody.appendChild(tr);
+          grid.appendChild(card);
         });
       } catch (_) {
       }
