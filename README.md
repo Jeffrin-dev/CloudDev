@@ -184,4 +184,4 @@ Apache 2.0 — see [LICENSE](LICENSE) for details.
 
 If CloudDev saves you time or money, please consider giving it a ⭐ on GitHub. It helps others find the project!
 
-> Built with ❤️ using Claude (Instructor) + Codex (Developer)
+> Built for devs
