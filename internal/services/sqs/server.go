@@ -3,21 +3,26 @@ package sqs
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
+	"time"
 )
 
 const xmlContentType = "text/xml"
 
 type Message struct {
-	MessageId     string
-	Body          string
-	ReceiptHandle string
+	MessageId      string
+	Body           string
+	ReceiptHandle  string
+	MessageGroupId string
 }
 
 type queue struct {
-	name     string
-	url      string
-	messages []Message
+	name          string
+	url           string
+	fifo          bool
+	messages      []Message
+	deduplication map[string]time.Time
 }
 
 type server struct {
@@ -65,6 +70,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.receiveMessage(w, r)
 	case "DeleteMessage":
 		s.deleteMessage(w, r)
+	case "GetQueueAttributes":
+		s.getQueueAttributes(w, r)
 	default:
 		writeError(w, "InvalidAction", "Unknown or missing Action")
 	}
@@ -81,9 +88,17 @@ func (s *server) createQueue(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.Unlock()
 
 	q, exists := s.queues[name]
+	isFIFO := strings.HasSuffix(name, ".fifo")
 	if !exists {
-		q = &queue{name: name, url: s.queueURL(name)}
+		q = &queue{
+			name:          name,
+			url:           s.queueURL(name),
+			fifo:          isFIFO,
+			deduplication: make(map[string]time.Time),
+		}
 		s.queues[name] = q
+	} else if isFIFO {
+		q.fifo = true
 	}
 
 	writeXML(w, fmt.Sprintf("<CreateQueueResponse><CreateQueueResult><QueueUrl>%s</QueueUrl></CreateQueueResult><ResponseMetadata><RequestId>req-createqueue</RequestId></ResponseMetadata></CreateQueueResponse>", q.url))
@@ -122,14 +137,41 @@ func (s *server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := r.FormValue("MessageBody")
+	groupID := r.FormValue("MessageGroupId")
+	dedupID := r.FormValue("MessageDeduplicationId")
 
 	s.mu.Lock()
+	if q.fifo {
+		if groupID == "" {
+			s.mu.Unlock()
+			writeError(w, "MissingParameter", "MessageGroupId is required for FIFO queues")
+			return
+		}
+
+		if dedupID != "" {
+			now := time.Now()
+			if seenAt, seen := q.deduplication[dedupID]; seen && now.Sub(seenAt) <= 5*time.Minute {
+				s.mu.Unlock()
+				writeXML(w, "<SendMessageResponse><SendMessageResult><MD5OfMessageBody>mock-md5</MD5OfMessageBody><MessageId>deduplicated</MessageId></SendMessageResult><ResponseMetadata><RequestId>req-sendmessage</RequestId></ResponseMetadata></SendMessageResponse>")
+				return
+			}
+
+			for id, seenAt := range q.deduplication {
+				if now.Sub(seenAt) > 5*time.Minute {
+					delete(q.deduplication, id)
+				}
+			}
+			q.deduplication[dedupID] = now
+		}
+	}
+
 	s.nextMessageID++
 	s.nextReceiptID++
 	msg := Message{
-		MessageId:     fmt.Sprintf("msg-%d", s.nextMessageID),
-		Body:          body,
-		ReceiptHandle: fmt.Sprintf("rh-%d", s.nextReceiptID),
+		MessageId:      fmt.Sprintf("msg-%d", s.nextMessageID),
+		Body:           body,
+		ReceiptHandle:  fmt.Sprintf("rh-%d", s.nextReceiptID),
+		MessageGroupId: groupID,
 	}
 	q.messages = append(q.messages, msg)
 	s.mu.Unlock()
@@ -148,6 +190,14 @@ func (s *server) receiveMessage(w http.ResponseWriter, r *http.Request) {
 	var messageXML string
 	if len(q.messages) > 0 {
 		m := q.messages[0]
+		if q.fifo && m.MessageGroupId == "" {
+			for _, candidate := range q.messages {
+				if candidate.MessageGroupId != "" {
+					m = candidate
+					break
+				}
+			}
+		}
 		messageXML = fmt.Sprintf("<Message><MessageId>%s</MessageId><ReceiptHandle>%s</ReceiptHandle><Body>%s</Body></Message>", m.MessageId, m.ReceiptHandle, m.Body)
 	}
 	s.mu.Unlock()
@@ -179,6 +229,25 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 
 	writeXML(w, "<DeleteMessageResponse><ResponseMetadata><RequestId>req-deletemessage</RequestId></ResponseMetadata></DeleteMessageResponse>")
+}
+
+func (s *server) getQueueAttributes(w http.ResponseWriter, r *http.Request) {
+	q := s.findQueue(r.FormValue("QueueUrl"), r.FormValue("QueueName"))
+	if q == nil {
+		writeError(w, "AWS.SimpleQueueService.NonExistentQueue", "Queue does not exist")
+		return
+	}
+
+	s.mu.Lock()
+	isFIFO := q.fifo
+	s.mu.Unlock()
+
+	fifoValue := "false"
+	if isFIFO {
+		fifoValue = "true"
+	}
+
+	writeXML(w, fmt.Sprintf("<GetQueueAttributesResponse><GetQueueAttributesResult><Attribute><Name>FifoQueue</Name><Value>%s</Value></Attribute></GetQueueAttributesResult><ResponseMetadata><RequestId>req-getqueueattributes</RequestId></ResponseMetadata></GetQueueAttributesResponse>", fifoValue))
 }
 
 func (s *server) findQueue(url, name string) *queue {
