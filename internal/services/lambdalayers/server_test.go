@@ -14,7 +14,7 @@ func TestPublishLayerVersion(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	t.Cleanup(srv.Close)
 
-	resp := doJSONRequest(t, http.MethodPost, srv.URL+"/2018-11-14/layers/utils/versions", map[string]any{
+	resp := doJSONRequest(t, http.MethodPost, srv.URL+"/2018-10-31/layers/utils/versions", map[string]any{
 		"Description":        "Common utility layer",
 		"CompatibleRuntimes": []string{"go1.x", "nodejs20.x"},
 	})
@@ -36,11 +36,11 @@ func TestListLayersReturnsLatestVersion(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	t.Cleanup(srv.Close)
 
-	doJSONRequest(t, http.MethodPost, srv.URL+"/2018-11-14/layers/shared/versions", map[string]any{"Description": "v1"}).Body.Close()
-	doJSONRequest(t, http.MethodPost, srv.URL+"/2018-11-14/layers/shared/versions", map[string]any{"Description": "v2"}).Body.Close()
-	doJSONRequest(t, http.MethodPost, srv.URL+"/2018-11-14/layers/data/versions", map[string]any{"Description": "first"}).Body.Close()
+	doJSONRequest(t, http.MethodPost, srv.URL+"/2018-10-31/layers/shared/versions", map[string]any{"Description": "v1"}).Body.Close()
+	doJSONRequest(t, http.MethodPost, srv.URL+"/2018-10-31/layers/shared/versions", map[string]any{"Description": "v2"}).Body.Close()
+	doJSONRequest(t, http.MethodPost, srv.URL+"/2018-10-31/layers/data/versions", map[string]any{"Description": "first"}).Body.Close()
 
-	resp, err := http.Get(srv.URL + "/2018-11-14/layers")
+	resp, err := http.Get(srv.URL + "/2018-10-31/layers")
 	if err != nil {
 		t.Fatalf("list layers failed: %v", err)
 	}
@@ -74,12 +74,12 @@ func TestGetLayerVersion(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	t.Cleanup(srv.Close)
 
-	doJSONRequest(t, http.MethodPost, srv.URL+"/2018-11-14/layers/image/versions", map[string]any{
+	doJSONRequest(t, http.MethodPost, srv.URL+"/2018-10-31/layers/image/versions", map[string]any{
 		"Description":        "Image dependencies",
 		"CompatibleRuntimes": []string{"python3.11"},
 	}).Body.Close()
 
-	resp, err := http.Get(srv.URL + "/2018-11-14/layers/image/versions/1")
+	resp, err := http.Get(srv.URL + "/2018-10-31/layers/image/versions/1")
 	if err != nil {
 		t.Fatalf("get layer version failed: %v", err)
 	}

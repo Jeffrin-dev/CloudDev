@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-const layersBasePath = "/2018-11-14/layers"
+const layersBasePath = "/2018-10-31/layers"
 
 const (
 	region    = "us-east-1"
