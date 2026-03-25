@@ -2,16 +2,21 @@ package cloudwatchmetrics
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"math"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
-const jsonContentType = "application/x-amz-json-1.1"
+const (
+	jsonContentType = "application/x-amz-json-1.1"
+	xmlContentType  = "text/xml"
+)
 
 type MetricDatum struct {
 	MetricName string
@@ -49,13 +54,248 @@ func Start(port int) error {
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "InvalidParameterException", "Only POST is supported")
+		writeXMLError(w, http.StatusMethodNotAllowed, "InvalidParameterValue", "Only POST is supported")
 		return
 	}
 
+	if err := r.ParseForm(); err == nil {
+		action := strings.TrimSpace(r.FormValue("Action"))
+		if action != "" {
+			s.serveActionXML(w, r, action)
+			return
+		}
+	}
+
+	s.serveLegacyTargetJSON(w, r)
+}
+
+func (s *server) serveActionXML(w http.ResponseWriter, r *http.Request, action string) {
+	switch action {
+	case "PutMetricData":
+		s.handlePutMetricDataForm(w, r)
+	case "GetMetricStatistics":
+		s.handleGetMetricStatisticsForm(w, r)
+	case "ListMetrics":
+		s.handleListMetricsForm(w, r)
+	case "PutMetricAlarm":
+		s.handlePutMetricAlarmForm(w, r)
+	case "DescribeAlarms":
+		s.handleDescribeAlarmsForm(w)
+	case "DeleteAlarms":
+		s.handleDeleteAlarmsForm(w, r)
+	default:
+		writeXMLError(w, http.StatusBadRequest, "InvalidAction", "Unknown Action")
+	}
+}
+
+func (s *server) handlePutMetricDataForm(w http.ResponseWriter, r *http.Request) {
+	namespace := strings.TrimSpace(r.FormValue("Namespace"))
+	if namespace == "" {
+		writeXMLError(w, http.StatusBadRequest, "InvalidParameterValue", "Namespace is required")
+		return
+	}
+
+	now := time.Now().UTC()
+	batch := make([]MetricDatum, 0)
+	for i := 1; ; i++ {
+		prefix := fmt.Sprintf("MetricData.member.%d.", i)
+		metricName := strings.TrimSpace(r.FormValue(prefix + "MetricName"))
+		valueStr := strings.TrimSpace(r.FormValue(prefix + "Value"))
+		unit := strings.TrimSpace(r.FormValue(prefix + "Unit"))
+
+		if metricName == "" && valueStr == "" && unit == "" {
+			break
+		}
+		if metricName == "" || valueStr == "" {
+			writeXMLError(w, http.StatusBadRequest, "InvalidParameterValue", "MetricName and Value are required")
+			return
+		}
+		value, err := strconv.ParseFloat(valueStr, 64)
+		if err != nil {
+			writeXMLError(w, http.StatusBadRequest, "InvalidParameterValue", "Metric value must be numeric")
+			return
+		}
+
+		batch = append(batch, MetricDatum{
+			MetricName: metricName,
+			Namespace:  namespace,
+			Value:      value,
+			Timestamp:  now,
+			Unit:       unit,
+		})
+	}
+
+	if len(batch) == 0 {
+		writeXMLError(w, http.StatusBadRequest, "InvalidParameterValue", "MetricData is required")
+		return
+	}
+
+	s.mu.Lock()
+	s.metrics = append(s.metrics, batch...)
+	s.mu.Unlock()
+
+	writeXML(w, http.StatusOK, putMetricDataResponse{XMLNS: awsCloudWatchNamespace})
+}
+
+func (s *server) handleGetMetricStatisticsForm(w http.ResponseWriter, r *http.Request) {
+	namespace := strings.TrimSpace(r.FormValue("Namespace"))
+	metricName := strings.TrimSpace(r.FormValue("MetricName"))
+	if namespace == "" || metricName == "" {
+		writeXMLError(w, http.StatusBadRequest, "InvalidParameterValue", "Namespace and MetricName are required")
+		return
+	}
+
+	s.mu.RLock()
+	filtered := make([]MetricDatum, 0)
+	for _, metric := range s.metrics {
+		if metric.Namespace == namespace && metric.MetricName == metricName {
+			filtered = append(filtered, metric)
+		}
+	}
+	s.mu.RUnlock()
+
+	stats := statisticsDatum{}
+	if len(filtered) > 0 {
+		sum := 0.0
+		minVal := math.MaxFloat64
+		maxVal := -math.MaxFloat64
+		for _, datum := range filtered {
+			sum += datum.Value
+			if datum.Value < minVal {
+				minVal = datum.Value
+			}
+			if datum.Value > maxVal {
+				maxVal = datum.Value
+			}
+		}
+		sampleCount := float64(len(filtered))
+		stats = statisticsDatum{
+			SampleCount: sampleCount,
+			Sum:         sum,
+			Average:     sum / sampleCount,
+			Minimum:     minVal,
+			Maximum:     maxVal,
+		}
+	}
+
+	writeXML(w, http.StatusOK, getMetricStatisticsResponse{
+		XMLNS: awsCloudWatchNamespace,
+		Datapoints: datapoints{
+			Members: []statisticsDatum{stats},
+		},
+	})
+}
+
+func (s *server) handleListMetricsForm(w http.ResponseWriter, r *http.Request) {
+	namespaceFilter := strings.TrimSpace(r.FormValue("Namespace"))
+
+	s.mu.RLock()
+	seen := make(map[string]struct{})
+	metrics := make([]metricMember, 0)
+	for _, metric := range s.metrics {
+		if namespaceFilter != "" && namespaceFilter != metric.Namespace {
+			continue
+		}
+		key := metric.Namespace + "|" + metric.MetricName
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		metrics = append(metrics, metricMember{MetricName: metric.MetricName, Namespace: metric.Namespace})
+	}
+	s.mu.RUnlock()
+
+	sort.Slice(metrics, func(i, j int) bool {
+		if metrics[i].Namespace == metrics[j].Namespace {
+			return metrics[i].MetricName < metrics[j].MetricName
+		}
+		return metrics[i].Namespace < metrics[j].Namespace
+	})
+
+	writeXML(w, http.StatusOK, listMetricsResponse{XMLNS: awsCloudWatchNamespace, Metrics: metricsList{Members: metrics}})
+}
+
+func (s *server) handlePutMetricAlarmForm(w http.ResponseWriter, r *http.Request) {
+	alarmName := strings.TrimSpace(r.FormValue("AlarmName"))
+	metricName := strings.TrimSpace(r.FormValue("MetricName"))
+	namespace := strings.TrimSpace(r.FormValue("Namespace"))
+	thresholdStr := strings.TrimSpace(r.FormValue("Threshold"))
+	comparisonOperator := strings.TrimSpace(r.FormValue("ComparisonOperator"))
+
+	if alarmName == "" || metricName == "" || namespace == "" || thresholdStr == "" || comparisonOperator == "" {
+		writeXMLError(w, http.StatusBadRequest, "InvalidParameterValue", "AlarmName, MetricName, Namespace, Threshold, and ComparisonOperator are required")
+		return
+	}
+
+	threshold, err := strconv.ParseFloat(thresholdStr, 64)
+	if err != nil {
+		writeXMLError(w, http.StatusBadRequest, "InvalidParameterValue", "Threshold must be numeric")
+		return
+	}
+
+	s.mu.Lock()
+	s.alarms[alarmName] = Alarm{
+		AlarmName:          alarmName,
+		MetricName:         metricName,
+		Namespace:          namespace,
+		Threshold:          threshold,
+		ComparisonOperator: comparisonOperator,
+		State:              "OK",
+	}
+	s.mu.Unlock()
+
+	writeXML(w, http.StatusOK, putMetricAlarmResponse{XMLNS: awsCloudWatchNamespace})
+}
+
+func (s *server) handleDescribeAlarmsForm(w http.ResponseWriter) {
+	s.mu.RLock()
+	alarms := make([]alarmMember, 0, len(s.alarms))
+	for _, alarm := range s.alarms {
+		alarms = append(alarms, alarmMember{
+			AlarmName:          alarm.AlarmName,
+			MetricName:         alarm.MetricName,
+			Namespace:          alarm.Namespace,
+			Threshold:          alarm.Threshold,
+			ComparisonOperator: alarm.ComparisonOperator,
+			StateValue:         alarm.State,
+		})
+	}
+	s.mu.RUnlock()
+
+	sort.Slice(alarms, func(i, j int) bool {
+		return alarms[i].AlarmName < alarms[j].AlarmName
+	})
+
+	writeXML(w, http.StatusOK, describeAlarmsResponse{XMLNS: awsCloudWatchNamespace, MetricAlarms: alarmList{Members: alarms}})
+}
+
+func (s *server) handleDeleteAlarmsForm(w http.ResponseWriter, r *http.Request) {
+	names := make([]string, 0)
+	for i := 1; ; i++ {
+		name := strings.TrimSpace(r.FormValue(fmt.Sprintf("AlarmNames.member.%d", i)))
+		if name == "" {
+			break
+		}
+		names = append(names, name)
+	}
+	if len(names) == 0 {
+		writeXMLError(w, http.StatusBadRequest, "InvalidParameterValue", "AlarmNames is required")
+		return
+	}
+
+	s.mu.Lock()
+	for _, name := range names {
+		delete(s.alarms, name)
+	}
+	s.mu.Unlock()
+
+	writeXML(w, http.StatusOK, deleteAlarmsResponse{XMLNS: awsCloudWatchNamespace})
+}
+
+func (s *server) serveLegacyTargetJSON(w http.ResponseWriter, r *http.Request) {
 	target := strings.TrimSpace(r.Header.Get("X-Amz-Target"))
 	if target == "" {
-		writeError(w, http.StatusBadRequest, "InvalidParameterException", "Missing X-Amz-Target header")
+		writeXMLError(w, http.StatusBadRequest, "MissingAction", "Action is required")
 		return
 	}
 
@@ -117,20 +357,11 @@ func (s *server) handlePutMetricData(w http.ResponseWriter, payload map[string]a
 			return
 		}
 		unit, _ := stringField(datumMap, "Unit")
-		timestamp := now
-		if rawTimestamp, exists := datumMap["Timestamp"]; exists {
-			parsed, err := parseTimestamp(rawTimestamp)
-			if err != nil {
-				writeError(w, http.StatusBadRequest, "InvalidParameterValue", "Timestamp must be RFC3339")
-				return
-			}
-			timestamp = parsed
-		}
 		batch = append(batch, MetricDatum{
 			MetricName: metricName,
 			Namespace:  namespace,
 			Value:      value,
-			Timestamp:  timestamp,
+			Timestamp:  now,
 			Unit:       unit,
 		})
 	}
@@ -244,7 +475,8 @@ func (s *server) handlePutMetricAlarm(w http.ResponseWriter, payload map[string]
 		return
 	}
 
-	alarm := Alarm{
+	s.mu.Lock()
+	s.alarms[alarmName] = Alarm{
 		AlarmName:          alarmName,
 		MetricName:         metricName,
 		Namespace:          namespace,
@@ -252,9 +484,6 @@ func (s *server) handlePutMetricAlarm(w http.ResponseWriter, payload map[string]
 		ComparisonOperator: comparisonOperator,
 		State:              "OK",
 	}
-
-	s.mu.Lock()
-	s.alarms[alarmName] = alarm
 	s.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, map[string]any{})
@@ -302,6 +531,99 @@ func (s *server) handleDeleteAlarms(w http.ResponseWriter, payload map[string]an
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
+const awsCloudWatchNamespace = "http://monitoring.amazonaws.com/doc/2010-08-01/"
+
+type putMetricDataResponse struct {
+	XMLName xml.Name `xml:"PutMetricDataResponse"`
+	XMLNS   string   `xml:"xmlns,attr"`
+}
+
+type statisticsDatum struct {
+	SampleCount float64 `xml:"SampleCount"`
+	Sum         float64 `xml:"Sum"`
+	Average     float64 `xml:"Average"`
+	Minimum     float64 `xml:"Minimum"`
+	Maximum     float64 `xml:"Maximum"`
+}
+
+type datapoints struct {
+	Members []statisticsDatum `xml:"member"`
+}
+
+type getMetricStatisticsResponse struct {
+	XMLName    xml.Name   `xml:"GetMetricStatisticsResponse"`
+	XMLNS      string     `xml:"xmlns,attr"`
+	Datapoints datapoints `xml:"GetMetricStatisticsResult>Datapoints"`
+}
+
+type metricMember struct {
+	MetricName string `xml:"MetricName"`
+	Namespace  string `xml:"Namespace"`
+}
+
+type metricsList struct {
+	Members []metricMember `xml:"member"`
+}
+
+type listMetricsResponse struct {
+	XMLName xml.Name    `xml:"ListMetricsResponse"`
+	XMLNS   string      `xml:"xmlns,attr"`
+	Metrics metricsList `xml:"ListMetricsResult>Metrics"`
+}
+
+type putMetricAlarmResponse struct {
+	XMLName xml.Name `xml:"PutMetricAlarmResponse"`
+	XMLNS   string   `xml:"xmlns,attr"`
+}
+
+type alarmMember struct {
+	AlarmName          string  `xml:"AlarmName"`
+	MetricName         string  `xml:"MetricName"`
+	Namespace          string  `xml:"Namespace"`
+	Threshold          float64 `xml:"Threshold"`
+	ComparisonOperator string  `xml:"ComparisonOperator"`
+	StateValue         string  `xml:"StateValue"`
+}
+
+type alarmList struct {
+	Members []alarmMember `xml:"member"`
+}
+
+type describeAlarmsResponse struct {
+	XMLName      xml.Name  `xml:"DescribeAlarmsResponse"`
+	XMLNS        string    `xml:"xmlns,attr"`
+	MetricAlarms alarmList `xml:"DescribeAlarmsResult>MetricAlarms"`
+}
+
+type deleteAlarmsResponse struct {
+	XMLName xml.Name `xml:"DeleteAlarmsResponse"`
+	XMLNS   string   `xml:"xmlns,attr"`
+}
+
+type errorResponse struct {
+	XMLName xml.Name `xml:"ErrorResponse"`
+	Error   struct {
+		Type    string `xml:"Type"`
+		Code    string `xml:"Code"`
+		Message string `xml:"Message"`
+	} `xml:"Error"`
+}
+
+func writeXML(w http.ResponseWriter, status int, payload any) {
+	w.Header().Set("Content-Type", xmlContentType)
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(xml.Header))
+	_ = xml.NewEncoder(w).Encode(payload)
+}
+
+func writeXMLError(w http.ResponseWriter, status int, code, message string) {
+	resp := errorResponse{}
+	resp.Error.Type = "Sender"
+	resp.Error.Code = code
+	resp.Error.Message = message
+	writeXML(w, status, resp)
+}
+
 func writeJSON(w http.ResponseWriter, status int, body map[string]any) {
 	w.Header().Set("Content-Type", jsonContentType)
 	w.WriteHeader(status)
@@ -334,16 +656,4 @@ func floatField(payload map[string]any, key string) (float64, bool) {
 		return 0, false
 	}
 	return asFloat, true
-}
-
-func parseTimestamp(raw any) (time.Time, error) {
-	value, ok := raw.(string)
-	if !ok {
-		return time.Time{}, fmt.Errorf("timestamp must be a string")
-	}
-	parsed, err := time.Parse(time.RFC3339, value)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return parsed.UTC(), nil
 }
