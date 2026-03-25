@@ -28,6 +28,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/sqs"
 	"github.com/clouddev/clouddev/internal/services/stepfunctions"
 	"github.com/clouddev/clouddev/internal/services/sts"
+	"github.com/clouddev/clouddev/internal/services/xray"
 	"github.com/spf13/cobra"
 )
 
@@ -114,6 +115,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("EventBridge server starting on port %d", 4587)
+		go func() {
+			if err := xray.Start(4588); err != nil {
+				fmt.Fprintf(os.Stderr, "X-Ray server error: %v\n", err)
+			}
+		}()
+		printSuccess("X-Ray server starting on port %d", 4588)
 		if true {
 			go func() {
 				if err := cloudwatchlogs.Start(4586); err != nil {
@@ -205,6 +212,7 @@ var upCmd = &cobra.Command{
 				"cloudformation":     4581,
 				"step_functions":     4585,
 				"eventbridge":        4587,
+				"xray":               4588,
 				"elasticache":        4598,
 				"elasticache_http":   4597,
 				"cognito":            4596,
