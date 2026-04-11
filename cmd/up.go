@@ -12,6 +12,7 @@ import (
 	"github.com/clouddev/clouddev/internal/docker"
 	"github.com/clouddev/clouddev/internal/persist"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
+	"github.com/clouddev/clouddev/internal/services/apigatewayv2"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchevents"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
@@ -121,6 +122,12 @@ var upCmd = &cobra.Command{
 				}
 			}()
 			printSuccess("API Gateway starting on port %d", cfg.Ports.APIGateway)
+			go func() {
+				if err := apigatewayv2.Start(4573); err != nil {
+					fmt.Fprintf(os.Stderr, "API Gateway v2 server error: %v\n", err)
+				}
+			}()
+			printSuccess("API Gateway v2 server starting on port %d", 4573)
 		}
 		go func() {
 			if err := secretsmanager.Start(4584); err != nil {
