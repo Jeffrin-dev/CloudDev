@@ -12,6 +12,7 @@ import (
 )
 
 const jsonContentType = "application/x-amz-json-1.0"
+const defaultShardID = "shardId-00000000000000000001"
 
 type Stream struct {
 	StreamArn    string
@@ -241,7 +242,7 @@ func (s *server) handleDescribeStream(w http.ResponseWriter, payload map[string]
 			"StreamLabel":  state.stream.StreamLabel,
 			"StreamStatus": state.stream.StreamStatus,
 			"Shards": []map[string]interface{}{{
-				"ShardId": "shard-0001",
+				"ShardId": defaultShardID,
 				"SequenceNumberRange": map[string]interface{}{
 					"StartingSequenceNumber": startingSeq,
 				},
@@ -261,7 +262,7 @@ func (s *server) handleGetShardIterator(w http.ResponseWriter, payload map[strin
 		writeError(w, http.StatusBadRequest, "ValidationException", "ShardId is required")
 		return
 	}
-	if shardID != "shard-0001" {
+	if shardID != defaultShardID {
 		writeError(w, http.StatusBadRequest, "ResourceNotFoundException", "Requested shard not found")
 		return
 	}

@@ -66,7 +66,7 @@ func TestDescribeStreamHasSingleShard(t *testing.T) {
 	if len(shards) != 1 {
 		t.Fatalf("expected one shard, got %#v", shards)
 	}
-	if shards[0].(map[string]interface{})["ShardId"] != "shard-0001" {
+	if shards[0].(map[string]interface{})["ShardId"] != defaultShardID {
 		t.Fatalf("unexpected shard id: %#v", shards[0])
 	}
 }
@@ -87,7 +87,7 @@ func TestGetShardIteratorAndGetRecords(t *testing.T) {
 
 	iterResp := doStreamsRequest(t, ts.URL, "DynamoDBStreams_20120810.GetShardIterator", map[string]interface{}{
 		"StreamArn":         streamArn,
-		"ShardId":           "shard-0001",
+		"ShardId":           defaultShardID,
 		"ShardIteratorType": "TRIM_HORIZON",
 	})
 	defer iterResp.Body.Close()
