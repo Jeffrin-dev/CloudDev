@@ -156,7 +156,13 @@ const dashboardHTML = `<!DOCTYPE html>
       cognito: 'Cognito',
       lambda_layers: 'Lambda Layers',
       ssm: 'SSM Parameter Store',
-      rekognition: 'Rekognition'
+      rekognition: 'Rekognition',
+      cloudwatch_events: 'CloudWatch Events',
+      ses: 'SES',
+      dynamodb_streams: 'DynamoDB Streams',
+      lambda_urls: 'Lambda Function URLs',
+      api_gateway_v2: 'API Gateway v2',
+      bedrock: 'Bedrock'
     };
 
     async function refreshStatus() {
@@ -192,7 +198,13 @@ const dashboardHTML = `<!DOCTYPE html>
           'elasticache_http',
           'cognito',
           'lambda_layers',
-          'rekognition'
+          'rekognition',
+          'cloudwatch_events',
+          'ses',
+          'dynamodb_streams',
+          'lambda_urls',
+          'api_gateway_v2',
+          'bedrock'
         ];
         order.forEach((key) => {
           const svc = data.services[key];
