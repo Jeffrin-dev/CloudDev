@@ -48,13 +48,45 @@ type server struct {
 }
 
 var activeServer *server
+var (
+	registryMu       sync.RWMutex
+	registeredStream = make(map[string]Stream)
+)
 
 func newServer() *server {
-	return &server{
+	srv := &server{
 		streams:    make(map[string]*streamState),
 		tableToArn: make(map[string]string),
 		iterators:  make(map[string]iteratorState),
 	}
+	registryMu.RLock()
+	for _, st := range registeredStream {
+		srv.registerStreamLocked(st.TableName, st.StreamArn)
+	}
+	registryMu.RUnlock()
+	return srv
+}
+
+func RegisterStream(tableName, streamArn string) {
+	if tableName == "" || streamArn == "" {
+		return
+	}
+	label := streamArn
+	if i := strings.LastIndex(streamArn, "/stream/"); i >= 0 {
+		label = streamArn[i+len("/stream/"):]
+	}
+	registryMu.Lock()
+	registeredStream[streamArn] = Stream{
+		StreamArn:    streamArn,
+		TableName:    tableName,
+		StreamLabel:  label,
+		StreamStatus: "ENABLED",
+	}
+	registryMu.Unlock()
+	if activeServer == nil {
+		return
+	}
+	activeServer.registerStream(tableName, streamArn)
 }
 
 func Start(port int) error {
@@ -82,15 +114,7 @@ func (s *server) publishRecord(tableName string, record StreamRecord) {
 	if !ok {
 		label := time.Now().UTC().Format("2006-01-02T15:04:05.000")
 		arn = fmt.Sprintf("arn:aws:dynamodb:local:000000000000:table/%s/stream/%s", tableName, label)
-		s.tableToArn[tableName] = arn
-		s.streams[arn] = &streamState{
-			stream: Stream{
-				StreamArn:    arn,
-				TableName:    tableName,
-				StreamLabel:  label,
-				StreamStatus: "ENABLED",
-			},
-		}
+		s.registerStreamLocked(tableName, arn)
 	}
 
 	if record.SequenceNumber == "" {
@@ -100,6 +124,34 @@ func (s *server) publishRecord(tableName string, record StreamRecord) {
 
 	state := s.streams[arn]
 	state.records = append(state.records, record)
+}
+
+func (s *server) registerStream(tableName, streamArn string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.registerStreamLocked(tableName, streamArn)
+}
+
+func (s *server) registerStreamLocked(tableName, streamArn string) {
+	if tableName == "" || streamArn == "" {
+		return
+	}
+	label := streamArn
+	if i := strings.LastIndex(streamArn, "/stream/"); i >= 0 {
+		label = streamArn[i+len("/stream/"):]
+	}
+	s.tableToArn[tableName] = streamArn
+	if _, exists := s.streams[streamArn]; !exists {
+		s.streams[streamArn] = &streamState{
+			stream: Stream{
+				StreamArn:    streamArn,
+				TableName:    tableName,
+				StreamLabel:  label,
+				StreamStatus: "ENABLED",
+			},
+			records: []StreamRecord{},
+		}
+	}
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
