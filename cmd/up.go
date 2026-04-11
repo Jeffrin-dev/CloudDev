@@ -13,6 +13,7 @@ import (
 	"github.com/clouddev/clouddev/internal/persist"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/apigatewayv2"
+	"github.com/clouddev/clouddev/internal/services/bedrock"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchevents"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
@@ -229,6 +230,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Rekognition server starting on port %d", 4594)
+		go func() {
+			if err := bedrock.Start(4591); err != nil {
+				fmt.Fprintf(os.Stderr, "Bedrock server error: %v\n", err)
+			}
+		}()
+		printSuccess("Bedrock server starting on port %d", 4591)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
@@ -270,6 +277,7 @@ var upCmd = &cobra.Command{
 				"route53":              4589,
 				"iam":                  4593,
 				"sts":                  4592,
+				"bedrock":              4591,
 				"kms":                  4599,
 				"cloudformation":       4581,
 				"step_functions":       4585,
