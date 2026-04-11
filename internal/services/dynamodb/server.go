@@ -7,8 +7,10 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/clouddev/clouddev/internal/persist"
+	"github.com/clouddev/clouddev/internal/services/dynamodbstreams"
 )
 
 const jsonContentType = "application/x-amz-json-1.0"
@@ -167,15 +169,28 @@ func (s *server) handleCreateTable(w http.ResponseWriter, payload map[string]int
 	}
 
 	s.tables[tableName] = &table{hashKey: hashKey, items: make(map[string]map[string]interface{})}
+
+	var latestStreamArn string
+	if streamEnabled(payload) {
+		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000")
+		latestStreamArn = fmt.Sprintf("arn:aws:dynamodb:us-east-1:000000000000:table/%s/stream/%s", tableName, timestamp)
+		dynamodbstreams.RegisterStream(tableName, latestStreamArn)
+	}
+
+	tableDescription := map[string]interface{}{
+		"TableName":   tableName,
+		"TableStatus": "ACTIVE",
+		"KeySchema": []map[string]interface{}{{
+			"AttributeName": hashKey,
+			"KeyType":       "HASH",
+		}},
+	}
+	if latestStreamArn != "" {
+		tableDescription["LatestStreamArn"] = latestStreamArn
+		tableDescription["StreamSpecification"] = map[string]interface{}{"StreamEnabled": true}
+	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"TableDescription": map[string]interface{}{
-			"TableName":   tableName,
-			"TableStatus": "ACTIVE",
-			"KeySchema": []map[string]interface{}{{
-				"AttributeName": hashKey,
-				"KeyType":       "HASH",
-			}},
-		},
+		"TableDescription": tableDescription,
 	})
 }
 
@@ -486,4 +501,17 @@ func cloneMap(src map[string]interface{}) map[string]interface{} {
 		out[k] = v
 	}
 	return out
+}
+
+func streamEnabled(payload map[string]interface{}) bool {
+	specRaw, ok := payload["StreamSpecification"]
+	if !ok {
+		return false
+	}
+	spec, ok := specRaw.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	enabled, ok := spec["StreamEnabled"].(bool)
+	return ok && enabled
 }
