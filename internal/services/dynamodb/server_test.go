@@ -154,6 +154,47 @@ func TestScanReturnsAllItems(t *testing.T) {
 	}
 }
 
+func TestUpdateItemSetExpressionReturnsUpdatedAttributes(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(newServer())
+	t.Cleanup(srv.Close)
+
+	createTable(t, srv.URL, "users", "id")
+	doDynamoRequest(t, srv.URL, "DynamoDB_20120810.PutItem", map[string]interface{}{
+		"TableName": "users",
+		"Item": map[string]interface{}{
+			"id":   map[string]interface{}{"S": "u3"},
+			"name": map[string]interface{}{"S": "Alice"},
+		},
+	}).Body.Close()
+
+	updateResp := doDynamoRequest(t, srv.URL, "DynamoDB_20120810.UpdateItem", map[string]interface{}{
+		"TableName":        "users",
+		"Key":              map[string]interface{}{"id": map[string]interface{}{"S": "u3"}},
+		"UpdateExpression": "SET name = :name, age = :age",
+		"ExpressionAttributeValues": map[string]interface{}{
+			":name": map[string]interface{}{"S": "Alicia"},
+			":age":  map[string]interface{}{"N": "31"},
+		},
+	})
+	defer updateResp.Body.Close()
+	if updateResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", updateResp.StatusCode)
+	}
+
+	var updateBody map[string]interface{}
+	decodeBody(t, updateResp.Body, &updateBody)
+	attrs, ok := updateBody["Attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected Attributes in response, got %#v", updateBody)
+	}
+	nameAttr := attrs["name"].(map[string]interface{})
+	ageAttr := attrs["age"].(map[string]interface{})
+	if nameAttr["S"] != "Alicia" || ageAttr["N"] != "31" {
+		t.Fatalf("unexpected updated attributes: %#v", attrs)
+	}
+}
+
 func createTable(t *testing.T, baseURL, name, hashKey string) {
 	t.Helper()
 	resp := doDynamoRequest(t, baseURL, "DynamoDB_20120810.CreateTable", map[string]interface{}{
