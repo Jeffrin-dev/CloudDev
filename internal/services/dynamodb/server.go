@@ -139,6 +139,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleGetItem(w, payload)
 	case "DynamoDB_20120810.DeleteItem":
 		s.handleDeleteItem(w, payload)
+	case "DynamoDB_20120810.UpdateItem":
+		s.handleUpdateItem(w, payload)
 	case "DynamoDB_20120810.Scan":
 		s.handleScan(w, payload)
 	case "DynamoDB_20120810.Query":
@@ -361,6 +363,115 @@ func (s *server) handleDeleteItem(w http.ResponseWriter, payload map[string]inte
 	}
 	delete(tbl.items, itemKey)
 	writeJSON(w, http.StatusOK, map[string]interface{}{})
+}
+
+func (s *server) handleUpdateItem(w http.ResponseWriter, payload map[string]interface{}) {
+	tableName, ok := stringField(payload, "TableName")
+	if !ok {
+		writeError(w, http.StatusBadRequest, "ValidationException", "TableName is required")
+		return
+	}
+	key, ok := objectField(payload, "Key")
+	if !ok {
+		writeError(w, http.StatusBadRequest, "ValidationException", "Key is required")
+		return
+	}
+	updateExpression, ok := stringField(payload, "UpdateExpression")
+	if !ok || strings.TrimSpace(updateExpression) == "" {
+		writeError(w, http.StatusBadRequest, "ValidationException", "UpdateExpression is required")
+		return
+	}
+	expressionAttributeValues, ok := objectField(payload, "ExpressionAttributeValues")
+	if !ok {
+		writeError(w, http.StatusBadRequest, "ValidationException", "ExpressionAttributeValues is required")
+		return
+	}
+
+	assignments, ok := parseSetUpdateExpression(updateExpression)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "ValidationException", "Only SET UpdateExpression is supported")
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tbl, exists := s.tables[tableName]
+	if !exists {
+		writeError(w, http.StatusBadRequest, "ResourceNotFoundException", "Requested resource not found")
+		return
+	}
+	keyRaw, ok := key[tbl.hashKey]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "ValidationException", "Missing hash key in key")
+		return
+	}
+	itemKey, ok := marshalKey(keyRaw)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "ValidationException", "Invalid hash key value")
+		return
+	}
+	item, found := tbl.items[itemKey]
+	if !found {
+		writeError(w, http.StatusBadRequest, "ResourceNotFoundException", "Requested resource not found")
+		return
+	}
+
+	updated := cloneMap(item)
+	for _, assignment := range assignments {
+		value, ok := expressionAttributeValues[assignment.placeholder]
+		if !ok {
+			writeError(w, http.StatusBadRequest, "ValidationException", "Missing expression attribute value")
+			return
+		}
+		updated[assignment.attribute] = value
+	}
+
+	tbl.items[itemKey] = updated
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"Attributes": cloneMap(updated),
+	})
+}
+
+type setAssignment struct {
+	attribute   string
+	placeholder string
+}
+
+func parseSetUpdateExpression(expr string) ([]setAssignment, bool) {
+	trimmed := strings.TrimSpace(expr)
+	if !strings.HasPrefix(strings.ToUpper(trimmed), "SET ") {
+		return nil, false
+	}
+
+	rest := strings.TrimSpace(trimmed[4:])
+	if rest == "" {
+		return nil, false
+	}
+
+	parts := strings.Split(rest, ",")
+	assignments := make([]setAssignment, 0, len(parts))
+	for _, part := range parts {
+		assignment := strings.TrimSpace(part)
+		if assignment == "" {
+			return nil, false
+		}
+		eqIndex := strings.Index(assignment, "=")
+		if eqIndex <= 0 || eqIndex >= len(assignment)-1 {
+			return nil, false
+		}
+		attribute := strings.TrimSpace(assignment[:eqIndex])
+		placeholder := strings.TrimSpace(assignment[eqIndex+1:])
+		if attribute == "" || placeholder == "" || !strings.HasPrefix(placeholder, ":") {
+			return nil, false
+		}
+		assignments = append(assignments, setAssignment{
+			attribute:   attribute,
+			placeholder: placeholder,
+		})
+	}
+
+	return assignments, true
 }
 
 func (s *server) handleScan(w http.ResponseWriter, payload map[string]interface{}) {
