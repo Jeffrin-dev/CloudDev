@@ -25,6 +25,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/kms"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/lambdalayers"
+	"github.com/clouddev/clouddev/internal/services/lambdaurls"
 	"github.com/clouddev/clouddev/internal/services/rekognition"
 	"github.com/clouddev/clouddev/internal/services/route53"
 	"github.com/clouddev/clouddev/internal/services/s3"
@@ -87,6 +88,12 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("Lambda server starting on port %d", cfg.Ports.Lambda)
 		}
+		go func() {
+			if err := lambdaurls.Start(4595, cfg.Ports.Lambda); err != nil {
+				fmt.Fprintf(os.Stderr, "Lambda Function URLs server error: %v\n", err)
+			}
+		}()
+		printSuccess("Lambda Function URLs server starting on port %d", 4595)
 		go func() {
 			if err := lambdalayers.Start(4578); err != nil {
 				fmt.Fprintf(os.Stderr, "Lambda Layers server error: %v\n", err)
@@ -250,20 +257,21 @@ var upCmd = &cobra.Command{
 				"ssm":             4583,
 				"cloudwatch_logs": 4586,
 				// v0.4.0 additions:
-				"cloudwatch_metrics": 4582,
-				"cloudwatch_events":  4590,
-				"xray":               4588,
-				"route53":            4589,
-				"iam":                4593,
-				"sts":                4592,
-				"kms":                4599,
-				"cloudformation":     4581,
-				"step_functions":     4585,
-				"eventbridge":        4587,
-				"elasticache":        4598,
-				"elasticache_http":   4597,
-				"cognito":            4596,
-				"rekognition":        4594,
+				"cloudwatch_metrics":   4582,
+				"cloudwatch_events":    4590,
+				"xray":                 4588,
+				"route53":              4589,
+				"iam":                  4593,
+				"sts":                  4592,
+				"kms":                  4599,
+				"cloudformation":       4581,
+				"step_functions":       4585,
+				"eventbridge":          4587,
+				"elasticache":          4598,
+				"elasticache_http":     4597,
+				"cognito":              4596,
+				"rekognition":          4594,
+				"lambda_function_urls": 4595,
 			}
 			if err := dashboard.Start(4580, serviceMap); err != nil {
 				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
