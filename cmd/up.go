@@ -28,6 +28,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/route53"
 	"github.com/clouddev/clouddev/internal/services/s3"
 	"github.com/clouddev/clouddev/internal/services/secretsmanager"
+	"github.com/clouddev/clouddev/internal/services/ses"
 	"github.com/clouddev/clouddev/internal/services/sqs"
 	"github.com/clouddev/clouddev/internal/services/ssm"
 	"github.com/clouddev/clouddev/internal/services/stepfunctions"
@@ -93,6 +94,12 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("SQS server starting on port %d", cfg.Ports.SQS)
 		}
+		go func() {
+			if err := ses.Start(4579); err != nil {
+				fmt.Fprintf(os.Stderr, "SES server error: %v\n", err)
+			}
+		}()
+		printSuccess("SES server starting on port %d", 4579)
 		if cfg.Services.APIGateway {
 			go func() {
 				if err := apigateway.Start(cfg.Ports.APIGateway, cfg.Ports.Lambda); err != nil {
@@ -229,6 +236,7 @@ var upCmd = &cobra.Command{
 				"lambda":          cfg.Ports.Lambda,
 				"lambda_layers":   4578,
 				"sqs":             cfg.Ports.SQS,
+				"ses":             4579,
 				"api_gateway":     cfg.Ports.APIGateway,
 				"sns":             4575,
 				"secrets_manager": 4584,
