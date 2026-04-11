@@ -18,6 +18,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/cloudwatchmetrics"
 	"github.com/clouddev/clouddev/internal/services/cognito"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
+	"github.com/clouddev/clouddev/internal/services/dynamodbstreams"
 	"github.com/clouddev/clouddev/internal/services/elasticache"
 	"github.com/clouddev/clouddev/internal/services/eventbridge"
 	"github.com/clouddev/clouddev/internal/services/iam"
@@ -71,6 +72,12 @@ var upCmd = &cobra.Command{
 				}
 			}()
 			printSuccess("DynamoDB server starting on port %d", cfg.Ports.DynamoDB)
+			go func() {
+				if err := dynamodbstreams.Start(4570); err != nil {
+					fmt.Fprintf(os.Stderr, "DynamoDB Streams server error: %v\n", err)
+				}
+			}()
+			printSuccess("DynamoDB Streams server starting on port %d", 4570)
 		}
 		if cfg.Services.Lambda {
 			go func() {
