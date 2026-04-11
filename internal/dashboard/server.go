@@ -109,6 +109,8 @@ const dashboardHTML = `<!DOCTYPE html>
     body { margin: 0; font-family: Arial, sans-serif; background: #f3f4f6; color: #111827; }
     header { background: #111827; color: #ffffff; padding: 20px 24px; }
     header h1 { margin: 0; font-size: 24px; }
+    .offline-banner { display: none; background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; margin: 16px auto 0; max-width: 900px; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+    .offline-banner.show { display: block; }
     main { max-width: 900px; margin: 24px auto; padding: 0 16px; }
     .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
     .service-card { background: #ffffff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 14px; border: 1px solid #e5e7eb; }
@@ -127,6 +129,7 @@ const dashboardHTML = `<!DOCTYPE html>
   <header>
     <h1>☁️ CloudDev Dashboard</h1>
   </header>
+  <div id="offline-banner" class="offline-banner">🔴 CloudDev Offline</div>
   <main>
     <div id="status-grid" class="status-grid"></div>
     <div class="muted">Auto-refresh every 5 seconds</div>
@@ -165,66 +168,78 @@ const dashboardHTML = `<!DOCTYPE html>
       bedrock: 'Bedrock'
     };
 
+    function renderServiceCards(order, services) {
+      const grid = document.getElementById('status-grid');
+      grid.innerHTML = '';
+      order.forEach((key) => {
+        const svc = services[key];
+        if (!svc) return;
+
+        const card = document.createElement('div');
+        card.className = 'service-card';
+        const statusClass = svc.running ? 'running' : 'stopped';
+        const statusText = svc.running ? 'Running' : 'Stopped';
+        const portText = svc.port > 0 ? svc.port : '-';
+        card.innerHTML = ` + "`" + `
+          <div class="service-name">${labels[key] || key}</div>
+          <div class="service-meta">Port: ${portText}</div>
+          <div class="service-status ${statusClass}">
+            <span class="status-dot"></span>
+            <span class="status-text">${statusText}</span>
+          </div>
+        ` + "`" + `;
+        grid.appendChild(card);
+      });
+    }
+
     async function refreshStatus() {
+      const banner = document.getElementById('offline-banner');
+      const order = [
+        's3',
+        'dynamodb',
+        'lambda',
+        'sqs',
+        'api_gateway',
+        'sns',
+        'secrets_manager',
+        'ssm',
+        'cloudwatch_logs',
+        'cloudwatch_metrics',
+        'iam',
+        'sts',
+        'kms',
+        'cloudformation',
+        'step_functions',
+        'eventbridge',
+        'xray',
+        'route53',
+        'elasticache',
+        'elasticache_http',
+        'cognito',
+        'lambda_layers',
+        'rekognition',
+        'cloudwatch_events',
+        'ses',
+        'dynamodb_streams',
+        'lambda_urls',
+        'api_gateway_v2',
+        'bedrock'
+      ];
       try {
         const res = await fetch('/api/status');
         if (!res.ok) {
-          return;
+          throw new Error('Status fetch failed');
         }
         const data = await res.json();
-        const grid = document.getElementById('status-grid');
-        grid.innerHTML = '';
-
-        const order = [
-          's3',
-          'dynamodb',
-          'lambda',
-          'sqs',
-          'api_gateway',
-          'sns',
-          'secrets_manager',
-          'ssm',
-          'cloudwatch_logs',
-          'cloudwatch_metrics',
-          'iam',
-          'sts',
-          'kms',
-          'cloudformation',
-          'step_functions',
-          'eventbridge',
-          'xray',
-          'route53',
-          'elasticache',
-          'elasticache_http',
-          'cognito',
-          'lambda_layers',
-          'rekognition',
-          'cloudwatch_events',
-          'ses',
-          'dynamodb_streams',
-          'lambda_urls',
-          'api_gateway_v2',
-          'bedrock'
-        ];
-        order.forEach((key) => {
-          const svc = data.services[key];
-          if (!svc) return;
-
-          const card = document.createElement('div');
-          card.className = 'service-card';
-          const statusClass = svc.running ? 'running' : 'stopped';
-          const statusText = svc.running ? 'Running' : 'Stopped';
-          card.innerHTML = ` + "`" + `
-            <div class="service-name">${labels[key] || key}</div>
-            <div class="service-meta">Port: ${svc.port}</div>
-            <div class="service-status ${statusClass}">
-              <span class="status-dot"></span>
-              <span class="status-text">${statusText}</span>
-            </div>
-          ` + "`" + `;
-          grid.appendChild(card);
-        });
+        banner.classList.remove('show');
+        renderServiceCards(order, data.services);
       } catch (_) {
+        const offlineServices = {};
+        order.forEach((key) => {
+          offlineServices[key] = { port: 0, running: false };
+        });
+        banner.classList.add('show');
+        renderServiceCards(order, offlineServices);
       }
     }
 
