@@ -13,6 +13,7 @@ import (
 	"github.com/clouddev/clouddev/internal/persist"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
+	"github.com/clouddev/clouddev/internal/services/cloudwatchevents"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchmetrics"
 	"github.com/clouddev/clouddev/internal/services/cognito"
@@ -153,6 +154,12 @@ var upCmd = &cobra.Command{
 			printSuccess("CloudWatch Metrics starting on port 4582")
 		}
 		go func() {
+			if err := cloudwatchevents.Start(4590); err != nil {
+				fmt.Fprintf(os.Stderr, "CloudWatch Events error: %v\n", err)
+			}
+		}()
+		printSuccess("CloudWatch Events server starting on port %d", 4590)
+		go func() {
 			if err := iam.Start(4593); err != nil {
 				fmt.Fprintf(os.Stderr, "IAM server error: %v\n", err)
 			}
@@ -217,18 +224,19 @@ var upCmd = &cobra.Command{
 		}
 		go func() {
 			serviceMap := map[string]int{
-				"s3":                 cfg.Ports.S3,
-				"dynamodb":           cfg.Ports.DynamoDB,
-				"lambda":             cfg.Ports.Lambda,
-				"lambda_layers":      4578,
-				"sqs":                cfg.Ports.SQS,
-				"api_gateway":        cfg.Ports.APIGateway,
-				"sns":                4575,
-				"secrets_manager":    4584,
-				"ssm":                4583,
-				"cloudwatch_logs":    4586,
+				"s3":              cfg.Ports.S3,
+				"dynamodb":        cfg.Ports.DynamoDB,
+				"lambda":          cfg.Ports.Lambda,
+				"lambda_layers":   4578,
+				"sqs":             cfg.Ports.SQS,
+				"api_gateway":     cfg.Ports.APIGateway,
+				"sns":             4575,
+				"secrets_manager": 4584,
+				"ssm":             4583,
+				"cloudwatch_logs": 4586,
 				// v0.4.0 additions:
 				"cloudwatch_metrics": 4582,
+				"cloudwatch_events":  4590,
 				"xray":               4588,
 				"route53":            4589,
 				"iam":                4593,
