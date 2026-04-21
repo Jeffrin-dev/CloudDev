@@ -24,6 +24,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/elasticache"
 	"github.com/clouddev/clouddev/internal/services/eventbridge"
 	"github.com/clouddev/clouddev/internal/services/iam"
+	"github.com/clouddev/clouddev/internal/services/kinesis"
 	"github.com/clouddev/clouddev/internal/services/kms"
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/lambdalayers"
@@ -236,6 +237,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Bedrock server starting on port %d", 4591)
+		go func() {
+			if err := kinesis.Start(4568); err != nil {
+				fmt.Fprintf(os.Stderr, "Kinesis server error: %v\n", err)
+			}
+		}()
+		printSuccess("Kinesis server starting on port %d", 4568)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
