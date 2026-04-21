@@ -15,7 +15,7 @@ CloudDev runs 29 AWS services locally as a single Go binary with zero runtime de
 - **29 AWS services** emulated locally — S3, DynamoDB, DynamoDB Streams, Lambda, Lambda Layers, Lambda Function URLs, SQS (+ FIFO), SNS, API Gateway, API Gateway v2, IAM, STS, KMS, CloudFormation, Step Functions, EventBridge, CloudWatch Events, Secrets Manager, CloudWatch Logs, CloudWatch Metrics, ElastiCache, Cognito, X-Ray, Route53, SSM Parameter Store, Rekognition, SES, and Bedrock
 - **Single binary** — no Docker, no Python, no Java runtime required
 - **Zero config** — works out of the box with your existing AWS CLI and SDKs
-- **Web dashboard** — real-time service status cards at `localhost:4580`
+- **Web dashboard** — real-time service status at `localhost:4580` with offline detection
 - **IaC support** — auto-detects Terraform, CloudFormation, and Kubernetes configs
 - **Lambda hot reload** — instant function updates without restarts
 - **Data persistence** — state survives restarts via `~/.clouddev/state.json`
@@ -245,6 +245,19 @@ go test ./...
 
 ### ✅ v0.5.0
 - [x] CloudWatch Events, SES, DynamoDB Streams, Lambda Function URLs, API Gateway v2, Bedrock
+- [x] Dashboard offline detection — flips to red when server stops
+- [x] DynamoDB UpdateItem support
+- [x] DynamoDB → Streams integration
+
+### 🚧 v0.6.0 (in progress)
+- [ ] Kinesis Data Streams
+- [ ] Kinesis Firehose
+- [ ] ECS (Elastic Container Service)
+- [ ] ECR (Elastic Container Registry)
+- [ ] CloudFront
+- [ ] AppSync
+- [ ] Athena
+- [ ] ACM (Certificate Manager)
 
 ---
 
@@ -264,4 +277,4 @@ Apache 2.0 — see [LICENSE](LICENSE) for details.
 
 If CloudDev saves you time or money, please consider giving it a ⭐ on GitHub!
 
-> Built for Devs
+> Built with Claude (Instructor) · Codex (Developer)
