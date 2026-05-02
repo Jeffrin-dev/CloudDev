@@ -23,6 +23,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/dynamodbstreams"
 	"github.com/clouddev/clouddev/internal/services/elasticache"
 	"github.com/clouddev/clouddev/internal/services/eventbridge"
+	"github.com/clouddev/clouddev/internal/services/firehose"
 	"github.com/clouddev/clouddev/internal/services/iam"
 	"github.com/clouddev/clouddev/internal/services/kinesis"
 	"github.com/clouddev/clouddev/internal/services/kms"
@@ -243,6 +244,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Kinesis server starting on port %d", 4568)
+		go func() {
+			if err := firehose.Start(4571); err != nil {
+				fmt.Fprintf(os.Stderr, "Firehose server error: %v\n", err)
+			}
+		}()
+		printSuccess("Firehose server starting on port %d", 4571)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
@@ -285,6 +292,7 @@ var upCmd = &cobra.Command{
 				"iam":                  4593,
 				"sts":                  4592,
 				"bedrock":              4591,
+				"firehose":             4571,
 				"kms":                  4599,
 				"cloudformation":       4581,
 				"step_functions":       4585,
