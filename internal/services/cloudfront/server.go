@@ -3,6 +3,7 @@ package cloudfront
 import (
 	"encoding/xml"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -77,42 +78,47 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type createDistributionRequest struct {
-	XMLName         xml.Name `xml:"CreateDistributionRequest"`
-	DistributionCfg struct {
-		Comment string `xml:"Comment"`
-		Origins struct {
-			Items []struct {
+type DistributionConfigInput struct {
+	Comment string `xml:"Comment"`
+	Origins struct {
+		Items struct {
+			Origins []struct {
 				Id         string `xml:"Id"`
 				DomainName string `xml:"DomainName"`
-			} `xml:"Items>Origin"`
-		} `xml:"Origins"`
-	} `xml:"DistributionConfig"`
+			} `xml:"Origin"`
+		} `xml:"Items"`
+	} `xml:"Origins"`
 }
 
 func (s *server) createDistribution(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	var req createDistributionRequest
+	var req struct {
+		DistributionConfig DistributionConfigInput `xml:"DistributionConfig"`
+		DistributionConfigInput
+	}
 	if err := xml.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("cloudfront: create distribution decode error: %v", err)
 		writeError(w, http.StatusBadRequest, "InvalidArgument", "Invalid XML body")
 		return
 	}
 
-	origins := make([]Origin, 0, len(req.DistributionCfg.Origins.Items))
-	for _, item := range req.DistributionCfg.Origins.Items {
-		id := strings.TrimSpace(item.Id)
-		domain := strings.TrimSpace(item.DomainName)
-		if id == "" || domain == "" {
-			writeError(w, http.StatusBadRequest, "InvalidArgument", "Origin Id and DomainName are required")
-			return
-		}
-		origins = append(origins, Origin{Id: id, DomainName: domain})
+	input := req.DistributionConfig
+	if input.Comment == "" && len(input.Origins.Items.Origins) == 0 {
+		input = req.DistributionConfigInput
+	}
+
+	origins := make([]Origin, 0, len(input.Origins.Items.Origins))
+	for _, item := range input.Origins.Items.Origins {
+		origins = append(origins, Origin{
+			Id:         strings.TrimSpace(item.Id),
+			DomainName: strings.TrimSpace(item.DomainName),
+		})
 	}
 
 	s.mu.Lock()
 	s.nextDistributionID++
 	dID := fmt.Sprintf("D%d", s.nextDistributionID)
-	dist := Distribution{Id: dID, DomainName: dID + ".cloudfront.localhost", Status: "Deployed", Origins: origins, Comment: strings.TrimSpace(req.DistributionCfg.Comment)}
+	dist := Distribution{Id: dID, DomainName: dID + ".cloudfront.localhost", Status: "Deployed", Origins: origins, Comment: strings.TrimSpace(input.Comment)}
 	s.distributions[dID] = dist
 	s.distributionOrder = append(s.distributionOrder, dID)
 	s.mu.Unlock()
