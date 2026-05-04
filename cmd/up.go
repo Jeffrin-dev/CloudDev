@@ -21,6 +21,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/cognito"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/dynamodbstreams"
+	"github.com/clouddev/clouddev/internal/services/ecs"
 	"github.com/clouddev/clouddev/internal/services/elasticache"
 	"github.com/clouddev/clouddev/internal/services/eventbridge"
 	"github.com/clouddev/clouddev/internal/services/firehose"
@@ -250,6 +251,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("Firehose server starting on port %d", 4571)
+		go func() {
+			if err := ecs.Start(4561); err != nil {
+				fmt.Fprintf(os.Stderr, "ECS server error: %v\n", err)
+			}
+		}()
+		printSuccess("ECS server starting on port %d", 4561)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
