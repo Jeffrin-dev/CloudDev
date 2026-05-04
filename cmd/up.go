@@ -14,6 +14,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/apigatewayv2"
 	"github.com/clouddev/clouddev/internal/services/appsync"
+	"github.com/clouddev/clouddev/internal/services/athena"
 	"github.com/clouddev/clouddev/internal/services/bedrock"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudfront"
@@ -218,6 +219,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("KMS server starting on port %d", 4599)
+		go func() {
+			if err := athena.Start(4564); err != nil {
+				fmt.Fprintf(os.Stderr, "Athena server error: %v\n", err)
+			}
+		}()
+		printSuccess("Athena server starting on port %d", 4564)
 		go func() {
 			if err := cloudformation.Start(4581); err != nil {
 				fmt.Fprintf(os.Stderr, "CloudFormation server error: %v\n", err)
