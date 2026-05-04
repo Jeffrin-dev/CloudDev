@@ -202,22 +202,21 @@ func (s *server) deleteDistribution(w http.ResponseWriter, id string) {
 	writeXML(w, http.StatusOK, resp)
 }
 
-type InvalidationBatchInput struct {
-	Paths struct {
-		Quantity int      `xml:"Quantity"`
-		Items    []string `xml:"Items>Path"`
-	} `xml:"Paths"`
-	CallerReference string `xml:"CallerReference"`
+type createInvalidationRequest struct {
+	XMLName           xml.Name `xml:"CreateInvalidationRequest"`
+	InvalidationBatch struct {
+		Paths struct {
+			Items []string `xml:"Items>Path"`
+		} `xml:"Paths"`
+	} `xml:"InvalidationBatch"`
 }
 
 func (s *server) createInvalidation(w http.ResponseWriter, r *http.Request, distributionID string) {
 	defer r.Body.Close()
-	var req struct {
-		InvalidationBatch InvalidationBatchInput `xml:"InvalidationBatch"`
-		InvalidationBatchInput
-	}
+	var req createInvalidationRequest
 	if err := xml.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("cloudfront: create invalidation decode error: %v", err)
+		writeError(w, http.StatusBadRequest, "InvalidArgument", "Invalid XML body")
+		return
 	}
 
 	s.mu.Lock()
@@ -232,7 +231,7 @@ func (s *server) createInvalidation(w http.ResponseWriter, r *http.Request, dist
 	s.invalidationsByDist[distributionID] = append(s.invalidationsByDist[distributionID], inv)
 	s.mu.Unlock()
 
-	_ = req // invalidation input accepted in relaxed form
+	_ = req // paths parsed from request body by XML tags
 	resp := struct {
 		XMLName      xml.Name      `xml:"CreateInvalidationResponse"`
 		Invalidation invalidationX `xml:"Invalidation"`
