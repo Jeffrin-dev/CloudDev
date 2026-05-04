@@ -15,6 +15,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/apigatewayv2"
 	"github.com/clouddev/clouddev/internal/services/bedrock"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
+	"github.com/clouddev/clouddev/internal/services/cloudfront"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchevents"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchmetrics"
@@ -216,6 +217,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("CloudFormation server starting on port %d", 4581)
+		go func() {
+			if err := cloudfront.Start(4563); err != nil {
+				fmt.Fprintf(os.Stderr, "CloudFront server error: %v\n", err)
+			}
+		}()
+		printSuccess("CloudFront server starting on port %d", 4563)
 		go func() {
 			if err := elasticache.Start(4598, 4597); err != nil {
 				fmt.Fprintf(os.Stderr, "ElastiCache server error: %v\n", err)
