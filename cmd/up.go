@@ -13,6 +13,7 @@ import (
 	"github.com/clouddev/clouddev/internal/persist"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/apigatewayv2"
+	"github.com/clouddev/clouddev/internal/services/appsync"
 	"github.com/clouddev/clouddev/internal/services/bedrock"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudfront"
@@ -135,6 +136,12 @@ var upCmd = &cobra.Command{
 			}()
 			printSuccess("API Gateway v2 server starting on port %d", 4573)
 		}
+		go func() {
+			if err := appsync.Start(4567); err != nil {
+				fmt.Fprintf(os.Stderr, "AppSync server error: %v\n", err)
+			}
+		}()
+		printSuccess("AppSync server starting on port %d", 4567)
 		go func() {
 			if err := secretsmanager.Start(4584); err != nil {
 				fmt.Fprintf(os.Stderr, "Secrets Manager server error: %v\n", err)
