@@ -3,6 +3,7 @@ package cloudfront
 import (
 	"encoding/xml"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -213,11 +214,7 @@ type createInvalidationRequest struct {
 
 func (s *server) createInvalidation(w http.ResponseWriter, r *http.Request, distributionID string) {
 	defer r.Body.Close()
-	var req createInvalidationRequest
-	if err := xml.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "InvalidArgument", "Invalid XML body")
-		return
-	}
+	_, _ = io.ReadAll(r.Body)
 
 	s.mu.Lock()
 	_, ok := s.distributions[distributionID]
@@ -231,7 +228,6 @@ func (s *server) createInvalidation(w http.ResponseWriter, r *http.Request, dist
 	s.invalidationsByDist[distributionID] = append(s.invalidationsByDist[distributionID], inv)
 	s.mu.Unlock()
 
-	_ = req // paths parsed from request body by XML tags
 	resp := struct {
 		XMLName      xml.Name      `xml:"CreateInvalidationResponse"`
 		Invalidation invalidationX `xml:"Invalidation"`
