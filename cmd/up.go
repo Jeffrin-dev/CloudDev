@@ -15,6 +15,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/apigatewayv2"
 	"github.com/clouddev/clouddev/internal/services/appsync"
 	"github.com/clouddev/clouddev/internal/services/athena"
+	"github.com/clouddev/clouddev/internal/services/acm"
 	"github.com/clouddev/clouddev/internal/services/bedrock"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudfront"
@@ -123,6 +124,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("SES server starting on port %d", 4579)
+		go func() {
+			if err := acm.Start(4560); err != nil {
+				fmt.Fprintf(os.Stderr, "ACM server error: %v\n", err)
+			}
+		}()
+		printSuccess("ACM server starting on port %d", 4560)
 		if cfg.Services.APIGateway {
 			go func() {
 				if err := apigateway.Start(cfg.Ports.APIGateway, cfg.Ports.Lambda); err != nil {
