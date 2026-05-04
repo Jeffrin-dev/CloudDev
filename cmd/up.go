@@ -21,6 +21,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/cognito"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/dynamodbstreams"
+	"github.com/clouddev/clouddev/internal/services/ecr"
 	"github.com/clouddev/clouddev/internal/services/ecs"
 	"github.com/clouddev/clouddev/internal/services/elasticache"
 	"github.com/clouddev/clouddev/internal/services/eventbridge"
@@ -257,6 +258,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("ECS server starting on port %d", 4561)
+		go func() {
+			if err := ecr.Start(4562); err != nil {
+				fmt.Fprintf(os.Stderr, "ECR server error: %v\n", err)
+			}
+		}()
+		printSuccess("ECR server starting on port %d", 4562)
 		manager, err := docker.NewManager(os.Stdout)
 		if err != nil {
 			return err
