@@ -2,17 +2,17 @@
 
 **A free, open-source local AWS emulator — the self-hosted alternative to LocalStack.**
 
-CloudDev runs 29 AWS services locally as a single Go binary with zero runtime dependencies. Built for developers who want fast, offline AWS development without cloud costs or vendor lock-in.
+CloudDev runs 37 AWS services locally as a single Go binary with zero runtime dependencies. Built for developers who want fast, offline AWS development without cloud costs or vendor lock-in.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/go-1.22-blue.svg)](https://golang.org)
-[![Version](https://img.shields.io/badge/version-v0.5.0-green.svg)](https://github.com/Jeffrin-dev/CloudDev/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.0-green.svg)](https://github.com/Jeffrin-dev/CloudDev/releases)
 
 ---
 
 ## ✨ Features
 
-- **29 AWS services** emulated locally — S3, DynamoDB, DynamoDB Streams, Lambda, Lambda Layers, Lambda Function URLs, SQS (+ FIFO), SNS, API Gateway, API Gateway v2, IAM, STS, KMS, CloudFormation, Step Functions, EventBridge, CloudWatch Events, Secrets Manager, CloudWatch Logs, CloudWatch Metrics, ElastiCache, Cognito, X-Ray, Route53, SSM Parameter Store, Rekognition, SES, and Bedrock
+- **37 AWS services** emulated locally — S3, DynamoDB, DynamoDB Streams, Lambda, Lambda Layers, Lambda Function URLs, SQS (+ FIFO), SNS, API Gateway, API Gateway v2, IAM, STS, KMS, CloudFormation, Step Functions, EventBridge, CloudWatch Events, Secrets Manager, CloudWatch Logs, CloudWatch Metrics, ElastiCache, Cognito, X-Ray, Route53, SSM Parameter Store, Rekognition, SES, Bedrock, Kinesis Data Streams, Kinesis Firehose, ECS, ECR, CloudFront, AppSync, Athena, and ACM
 - **Single binary** — no Docker, no Python, no Java runtime required
 - **Zero config** — works out of the box with your existing AWS CLI and SDKs
 - **Web dashboard** — real-time service status at `localhost:4580` with offline detection
@@ -109,6 +109,45 @@ curl -X POST http://localhost:4591/foundation-models
 curl -X POST http://localhost:4591/model/anthropic.claude-3-sonnet-20240229-v1:0/invoke \
     -H "Content-Type: application/json" \
     -d '{"prompt":"Hello!","max_tokens_to_sample":100}'
+
+# Kinesis Data Streams
+aws --endpoint-url=http://localhost:4568 kinesis create-stream \
+    --stream-name my-stream --shard-count 2
+aws --endpoint-url=http://localhost:4568 kinesis put-record \
+    --stream-name my-stream --data "hello" --partition-key "pk1"
+
+# Kinesis Firehose
+aws --endpoint-url=http://localhost:4571 firehose create-delivery-stream \
+    --delivery-stream-name my-stream --delivery-stream-type DirectPut
+
+# ECS
+aws --endpoint-url=http://localhost:4561 ecs create-cluster --cluster-name my-cluster
+aws --endpoint-url=http://localhost:4561 ecs register-task-definition \
+    --family my-task \
+    --container-definitions '[{"name":"app","image":"nginx","memory":128,"cpu":64}]'
+
+# ECR
+aws --endpoint-url=http://localhost:4562 ecr create-repository --repository-name my-repo
+aws --endpoint-url=http://localhost:4562 ecr get-authorization-token
+
+# CloudFront
+curl -X POST http://localhost:4563/2020-05-31/distribution \
+    -H "Content-Type: application/xml" \
+    -d '<DistributionConfig><Comment>my-cdn</Comment><Origins><Items><Origin><Id>o1</Id><DomainName>s3.amazonaws.com</DomainName></Origin></Items></Origins></DistributionConfig>'
+
+# AppSync
+curl -X POST http://localhost:4567/v1/apis \
+    -H "Content-Type: application/json" \
+    -d '{"name":"my-api","authenticationType":"API_KEY"}'
+
+# Athena
+aws --endpoint-url=http://localhost:4564 athena start-query-execution \
+    --query-string "SELECT * FROM my_table" \
+    --query-execution-context Database=mydb
+
+# ACM
+aws --endpoint-url=http://localhost:4560 acm request-certificate \
+    --domain-name example.com
 ```
 
 ---
@@ -117,36 +156,44 @@ curl -X POST http://localhost:4591/model/anthropic.claude-3-sonnet-20240229-v1:0
 
 | Service | Port | Since |
 |---|---|---|
+| ACM | 4560 | v0.6.0 |
+| ECS | 4561 | v0.6.0 |
+| ECR | 4562 | v0.6.0 |
+| CloudFront | 4563 | v0.6.0 |
+| Athena | 4564 | v0.6.0 |
 | S3 | 4566 | v0.1.0 |
+| AppSync | 4567 | v0.6.0 |
+| Kinesis Data Streams | 4568 | v0.6.0 |
 | DynamoDB | 4569 | v0.1.0 |
-| Lambda | 4574 | v0.1.0 |
-| SQS (+ FIFO) | 4576 | v0.1.0 |
+| DynamoDB Streams | 4570 | v0.5.0 |
+| Kinesis Firehose | 4571 | v0.6.0 |
 | API Gateway | 4572 | v0.1.0 |
-| Dashboard | 4580 | v0.1.0 |
+| API Gateway v2 | 4573 | v0.5.0 |
+| Lambda | 4574 | v0.1.0 |
 | SNS | 4575 | v0.2.0 |
-| Secrets Manager | 4584 | v0.2.0 |
-| CloudWatch Logs | 4586 | v0.2.0 |
-| IAM | 4593 | v0.3.0 |
-| STS | 4592 | v0.3.0 |
-| KMS | 4599 | v0.3.0 |
-| CloudFormation | 4581 | v0.3.0 |
-| Step Functions | 4585 | v0.3.0 |
-| EventBridge | 4587 | v0.3.0 |
-| ElastiCache (Redis) | 4598 | v0.3.0 |
-| ElastiCache (HTTP) | 4597 | v0.3.0 |
-| Cognito | 4596 | v0.3.0 |
-| CloudWatch Metrics | 4582 | v0.4.0 |
+| SQS (+ FIFO) | 4576 | v0.1.0 |
 | Lambda Layers | 4578 | v0.4.0 |
+| SES | 4579 | v0.5.0 |
+| Dashboard | 4580 | v0.1.0 |
+| CloudFormation | 4581 | v0.3.0 |
+| CloudWatch Metrics | 4582 | v0.4.0 |
+| SSM Parameter Store | 4583 | v0.4.0 |
+| Secrets Manager | 4584 | v0.2.0 |
+| Step Functions | 4585 | v0.3.0 |
+| CloudWatch Logs | 4586 | v0.2.0 |
+| EventBridge | 4587 | v0.3.0 |
 | X-Ray | 4588 | v0.4.0 |
 | Route53 | 4589 | v0.4.0 |
-| SSM Parameter Store | 4583 | v0.4.0 |
-| Rekognition | 4594 | v0.4.0 |
 | CloudWatch Events | 4590 | v0.5.0 |
-| SES | 4579 | v0.5.0 |
-| DynamoDB Streams | 4570 | v0.5.0 |
-| Lambda Function URLs | 4595 | v0.5.0 |
-| API Gateway v2 | 4573 | v0.5.0 |
 | Bedrock | 4591 | v0.5.0 |
+| STS | 4592 | v0.3.0 |
+| IAM | 4593 | v0.3.0 |
+| Rekognition | 4594 | v0.4.0 |
+| Lambda Function URLs | 4595 | v0.5.0 |
+| Cognito | 4596 | v0.3.0 |
+| ElastiCache (HTTP) | 4597 | v0.3.0 |
+| ElastiCache (Redis) | 4598 | v0.3.0 |
+| KMS | 4599 | v0.3.0 |
 
 ---
 
@@ -163,34 +210,42 @@ clouddev/
 │   ├── persist/            # State persistence
 │   ├── costestimator/      # AWS cost estimator
 │   └── services/
-│       ├── s3/
+│       ├── acm/
+│       ├── appsync/
+│       ├── athena/
+│       ├── apigateway/
+│       ├── apigatewayv2/
+│       ├── bedrock/
+│       ├── cloudformation/
+│       ├── cloudfront/
+│       ├── cloudwatchevents/
+│       ├── cloudwatchlogs/
+│       ├── cloudwatchmetrics/
+│       ├── cognito/
 │       ├── dynamodb/
 │       ├── dynamodbstreams/
+│       ├── ecr/
+│       ├── ecs/
+│       ├── elasticache/
+│       ├── eventbridge/
+│       ├── firehose/
+│       ├── iam/
+│       ├── kinesis/
+│       ├── kms/
 │       ├── lambda/
 │       ├── lambdalayers/
 │       ├── lambdaurls/
-│       ├── sqs/
-│       ├── sns/
-│       ├── apigateway/
-│       ├── apigatewayv2/
-│       ├── iam/
-│       ├── sts/
-│       ├── kms/
-│       ├── cloudformation/
-│       ├── cloudwatchlogs/
-│       ├── cloudwatchmetrics/
-│       ├── cloudwatchevents/
-│       ├── stepfunctions/
-│       ├── eventbridge/
-│       ├── secretsmanager/
-│       ├── elasticache/
-│       ├── cognito/
-│       ├── xray/
-│       ├── route53/
-│       ├── ssm/
-│       ├── ses/
 │       ├── rekognition/
-│       └── bedrock/
+│       ├── route53/
+│       ├── s3/
+│       ├── secretsmanager/
+│       ├── ses/
+│       ├── sns/
+│       ├── sqs/
+│       ├── ssm/
+│       ├── stepfunctions/
+│       ├── sts/
+│       └── xray/
 ├── go.mod
 └── main.go
 ```
@@ -249,15 +304,15 @@ go test ./...
 - [x] DynamoDB UpdateItem support
 - [x] DynamoDB → Streams integration
 
-### 🚧 v0.6.0 (in progress)
-- [ ] Kinesis Data Streams
-- [ ] Kinesis Firehose
-- [ ] ECS (Elastic Container Service)
-- [ ] ECR (Elastic Container Registry)
-- [ ] CloudFront
-- [ ] AppSync
-- [ ] Athena
-- [ ] ACM (Certificate Manager)
+### ✅ v0.6.0
+- [x] Kinesis Data Streams
+- [x] Kinesis Firehose
+- [x] ECS (Elastic Container Service)
+- [x] ECR (Elastic Container Registry)
+- [x] CloudFront
+- [x] AppSync
+- [x] Athena
+- [x] ACM (Certificate Manager)
 
 ---
 
