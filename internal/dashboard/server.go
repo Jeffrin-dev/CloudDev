@@ -165,7 +165,15 @@ const dashboardHTML = `<!DOCTYPE html>
       dynamodb_streams: 'DynamoDB Streams',
       lambda_urls: 'Lambda Function URLs',
       api_gateway_v2: 'API Gateway v2',
-      bedrock: 'Bedrock'
+      bedrock: 'Bedrock',
+      acm: 'ACM',
+      ecs: 'ECS',
+      ecr: 'ECR',
+      cloudfront: 'CloudFront',
+      athena: 'Athena',
+      appsync: 'AppSync',
+      kinesis: 'Kinesis Data Streams',
+      firehose: 'Kinesis Firehose'
     };
 
     function renderServiceCards(order, services) {
@@ -223,7 +231,15 @@ const dashboardHTML = `<!DOCTYPE html>
         'dynamodb_streams',
         'lambda_urls',
         'api_gateway_v2',
-        'bedrock'
+        'bedrock',
+        'acm',
+        'ecs',
+        'ecr',
+        'cloudfront',
+        'athena',
+        'appsync',
+        'kinesis',
+        'firehose'
       ];
       try {
         const res = await fetch('/api/status');
