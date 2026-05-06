@@ -11,11 +11,11 @@ import (
 	"github.com/clouddev/clouddev/internal/dashboard"
 	"github.com/clouddev/clouddev/internal/docker"
 	"github.com/clouddev/clouddev/internal/persist"
+	"github.com/clouddev/clouddev/internal/services/acm"
 	"github.com/clouddev/clouddev/internal/services/apigateway"
 	"github.com/clouddev/clouddev/internal/services/apigatewayv2"
 	"github.com/clouddev/clouddev/internal/services/appsync"
 	"github.com/clouddev/clouddev/internal/services/athena"
-	"github.com/clouddev/clouddev/internal/services/acm"
 	"github.com/clouddev/clouddev/internal/services/bedrock"
 	"github.com/clouddev/clouddev/internal/services/cloudformation"
 	"github.com/clouddev/clouddev/internal/services/cloudfront"
@@ -25,6 +25,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/cognito"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/dynamodbstreams"
+	"github.com/clouddev/clouddev/internal/services/ec2"
 	"github.com/clouddev/clouddev/internal/services/ecr"
 	"github.com/clouddev/clouddev/internal/services/ecs"
 	"github.com/clouddev/clouddev/internal/services/elasticache"
@@ -214,6 +215,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("IAM server starting on port %d", 4593)
+		go func() {
+			if err := ec2.Start(4600); err != nil {
+				fmt.Fprintf(os.Stderr, "EC2 server error: %v\n", err)
+			}
+		}()
+		printSuccess("EC2 server starting on port %d", 4600)
 		go func() {
 			if err := sts.Start(4592); err != nil {
 				fmt.Fprintf(os.Stderr, "STS server error: %v\n", err)
