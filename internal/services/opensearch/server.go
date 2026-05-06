@@ -44,23 +44,29 @@ func Start(port int) error {
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	parts := splitPath(r.URL.Path)
-	if len(parts) < 3 || parts[0] != "2021-01-01" || parts[1] != "opensearch" || parts[2] != "domain" {
+	offset := 0
+	switch {
+	case len(parts) >= 2 && parts[0] == "2021-01-01" && parts[1] == "domain":
+		offset = 0
+	case len(parts) >= 3 && parts[0] == "2021-01-01" && parts[1] == "opensearch" && parts[2] == "domain":
+		offset = 1
+	default:
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "Not Found"})
 		return
 	}
 
 	switch {
-	case len(parts) == 3 && r.Method == http.MethodPost:
+	case len(parts) == 2+offset && r.Method == http.MethodPost:
 		s.createDomain(w, r)
-	case len(parts) == 3 && r.Method == http.MethodGet:
+	case len(parts) == 2+offset && r.Method == http.MethodGet:
 		s.listDomainNames(w)
-	case len(parts) == 4 && r.Method == http.MethodGet:
-		s.describeDomain(w, parts[3])
-	case len(parts) == 4 && r.Method == http.MethodDelete:
-		s.deleteDomain(w, parts[3])
-	case len(parts) == 5 && parts[4] == "tags" && r.Method == http.MethodPost:
+	case len(parts) == 3+offset && r.Method == http.MethodGet:
+		s.describeDomain(w, parts[2+offset])
+	case len(parts) == 3+offset && r.Method == http.MethodDelete:
+		s.deleteDomain(w, parts[2+offset])
+	case len(parts) == 4+offset && parts[3+offset] == "tags" && r.Method == http.MethodPost:
 		s.addTags(w, r)
-	case len(parts) == 5 && parts[4] == "tags" && r.Method == http.MethodGet:
+	case len(parts) == 4+offset && parts[3+offset] == "tags" && r.Method == http.MethodGet:
 		s.listTags(w, r)
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "Method Not Allowed"})
