@@ -37,6 +37,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/lambdalayers"
 	"github.com/clouddev/clouddev/internal/services/lambdaurls"
+	"github.com/clouddev/clouddev/internal/services/opensearch"
 	"github.com/clouddev/clouddev/internal/services/rds"
 	"github.com/clouddev/clouddev/internal/services/rekognition"
 	"github.com/clouddev/clouddev/internal/services/route53"
@@ -229,6 +230,12 @@ var upCmd = &cobra.Command{
 		}()
 		printSuccess("RDS server starting on port %d", 4601)
 		go func() {
+			if err := opensearch.Start(4602); err != nil {
+				fmt.Fprintf(os.Stderr, "OpenSearch server error: %v\n", err)
+			}
+		}()
+		printSuccess("OpenSearch server starting on port %d", 4602)
+		go func() {
 			if err := sts.Start(4592); err != nil {
 				fmt.Fprintf(os.Stderr, "STS server error: %v\n", err)
 			}
@@ -359,6 +366,7 @@ var upCmd = &cobra.Command{
 				"rekognition":          4594,
 				"lambda_function_urls": 4595,
 				"rds":                  4601,
+				"opensearch":           4602,
 			}
 			if err := dashboard.Start(4580, serviceMap); err != nil {
 				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
