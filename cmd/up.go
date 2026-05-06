@@ -37,6 +37,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/lambda"
 	"github.com/clouddev/clouddev/internal/services/lambdalayers"
 	"github.com/clouddev/clouddev/internal/services/lambdaurls"
+	"github.com/clouddev/clouddev/internal/services/rds"
 	"github.com/clouddev/clouddev/internal/services/rekognition"
 	"github.com/clouddev/clouddev/internal/services/route53"
 	"github.com/clouddev/clouddev/internal/services/s3"
@@ -222,6 +223,12 @@ var upCmd = &cobra.Command{
 		}()
 		printSuccess("EC2 server starting on port %d", 4600)
 		go func() {
+			if err := rds.Start(4601); err != nil {
+				fmt.Fprintf(os.Stderr, "RDS server error: %v\n", err)
+			}
+		}()
+		printSuccess("RDS server starting on port %d", 4601)
+		go func() {
 			if err := sts.Start(4592); err != nil {
 				fmt.Fprintf(os.Stderr, "STS server error: %v\n", err)
 			}
@@ -351,6 +358,7 @@ var upCmd = &cobra.Command{
 				"cognito":              4596,
 				"rekognition":          4594,
 				"lambda_function_urls": 4595,
+				"rds":                  4601,
 			}
 			if err := dashboard.Start(4580, serviceMap); err != nil {
 				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
