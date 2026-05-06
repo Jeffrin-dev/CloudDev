@@ -44,6 +44,17 @@ func Start(port int) error {
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	parts := splitPath(r.URL.Path)
+
+	if len(parts) == 2 && parts[0] == "2021-01-01" && parts[1] == "tags" && r.Method == http.MethodPost {
+		s.addTags(w, r)
+		return
+	}
+
+	if len(parts) == 2 && parts[0] == "2021-01-01" && parts[1] == "tags" && r.Method == http.MethodGet {
+		s.listTags(w, r)
+		return
+	}
+
 	offset := 0
 	switch {
 	case len(parts) >= 2 && parts[0] == "2021-01-01" && parts[1] == "domain":
