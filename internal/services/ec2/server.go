@@ -56,7 +56,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "TerminateInstances":
 		s.setInstanceState(w, r, "terminated", "TerminateInstancesResponse")
 	case "StopInstances":
-		s.setInstanceState(w, r, "stopped", "StopInstancesResponse")
+		s.setInstanceState(w, r, "stopping", "StopInstancesResponse")
 	case "StartInstances":
 		s.setInstanceState(w, r, "running", "StartInstancesResponse")
 	case "DescribeImages":
@@ -127,21 +127,76 @@ func (s *server) describeInstances(w http.ResponseWriter) {
 }
 
 func (s *server) setInstanceState(w http.ResponseWriter, r *http.Request, state string, root string) {
-	ids := r.Form["InstanceId"]
-	if len(ids) == 0 {
-		if v := r.FormValue("InstanceId"); v != "" {
-			ids = []string{v}
-		}
-	}
+	ids := instanceIDsFromForm(r)
 	s.mu.Lock()
+	changes := make([]string, 0, len(ids))
 	for _, id := range ids {
-		if inst, ok := s.instances[id]; ok {
-			inst.State = state
-			s.instances[id] = inst
+		inst, ok := s.instances[id]
+		if !ok {
+			continue
 		}
+		previousState := inst.State
+		inst.State = state
+		s.instances[id] = inst
+		changes = append(changes, fmt.Sprintf("<item><instanceId>%s</instanceId><previousState><code>%d</code><name>%s</name></previousState><currentState><code>%d</code><name>%s</name></currentState></item>", id, stateCode(previousState), previousState, stateCode(state), state))
 	}
 	s.mu.Unlock()
-	writeXML(w, fmt.Sprintf("<%s xmlns=\"%s\"></%s>", root, apiNamespace, root))
+	writeXML(w, fmt.Sprintf("<%s xmlns=\"%s\"><instancesSet>%s</instancesSet></%s>", root, apiNamespace, strings.Join(changes, ""), root))
+}
+
+func instanceIDsFromForm(r *http.Request) []string {
+	ids := append([]string{}, r.Form["InstanceId"]...)
+	if v := r.FormValue("InstanceId"); v != "" {
+		ids = append(ids, v)
+	}
+	type indexedID struct {
+		index int
+		id    string
+	}
+	indexed := make([]indexedID, 0)
+	for key, vals := range r.Form {
+		if !strings.HasPrefix(key, "InstanceId.") || len(vals) == 0 {
+			continue
+		}
+		idx, err := strconv.Atoi(strings.TrimPrefix(key, "InstanceId."))
+		if err != nil {
+			continue
+		}
+		indexed = append(indexed, indexedID{index: idx, id: vals[0]})
+	}
+	sort.Slice(indexed, func(i, j int) bool { return indexed[i].index < indexed[j].index })
+	for _, entry := range indexed {
+		ids = append(ids, entry.id)
+	}
+	seen := map[string]bool{}
+	unique := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		unique = append(unique, id)
+	}
+	return unique
+}
+
+func stateCode(state string) int {
+	switch state {
+	case "pending":
+		return 0
+	case "running":
+		return 16
+	case "shutting-down":
+		return 32
+	case "terminated":
+		return 48
+	case "stopping":
+		return 64
+	case "stopped":
+		return 80
+	default:
+		return 0
+	}
 }
 
 func (s *server) describeImages(w http.ResponseWriter) {
