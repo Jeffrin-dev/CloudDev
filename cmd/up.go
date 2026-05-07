@@ -50,6 +50,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/ssm"
 	"github.com/clouddev/clouddev/internal/services/stepfunctions"
 	"github.com/clouddev/clouddev/internal/services/sts"
+	"github.com/clouddev/clouddev/internal/services/waf"
 	"github.com/clouddev/clouddev/internal/services/xray"
 	"github.com/spf13/cobra"
 )
@@ -219,6 +220,12 @@ var upCmd = &cobra.Command{
 			}
 		}()
 		printSuccess("IAM server starting on port %d", 4593)
+		go func() {
+			if err := waf.Start(4605); err != nil {
+				fmt.Fprintf(os.Stderr, "WAF v2 server error: %v\n", err)
+			}
+		}()
+		printSuccess("WAF v2 server starting on port %d", 4605)
 		go func() {
 			if err := ec2.Start(4600); err != nil {
 				fmt.Fprintf(os.Stderr, "EC2 server error: %v\n", err)
