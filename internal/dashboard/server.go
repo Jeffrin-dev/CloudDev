@@ -173,7 +173,13 @@ const dashboardHTML = `<!DOCTYPE html>
       athena: 'Athena',
       appsync: 'AppSync',
       kinesis: 'Kinesis Data Streams',
-      firehose: 'Kinesis Firehose'
+      firehose: 'Kinesis Firehose',
+      ec2: 'EC2',
+      rds: 'RDS',
+      opensearch: 'OpenSearch',
+      msk: 'MSK',
+      codepipeline: 'CodePipeline',
+      waf: 'WAF'
     };
 
     function renderServiceCards(order, services) {
@@ -239,7 +245,13 @@ const dashboardHTML = `<!DOCTYPE html>
         'athena',
         'appsync',
         'kinesis',
-        'firehose'
+        'firehose',
+        'ec2',
+        'rds',
+        'opensearch',
+        'msk',
+        'codepipeline',
+        'waf'
       ];
       try {
         const res = await fetch('/api/status');
