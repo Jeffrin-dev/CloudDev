@@ -2,17 +2,17 @@
 
 **A free, open-source local AWS emulator — the self-hosted alternative to LocalStack.**
 
-CloudDev runs 37 AWS services locally as a single Go binary with zero runtime dependencies. Built for developers who want fast, offline AWS development without cloud costs or vendor lock-in.
+CloudDev runs 43 AWS services locally as a single Go binary with zero runtime dependencies. Built for developers who want fast, offline AWS development without cloud costs or vendor lock-in.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/go-1.22-blue.svg)](https://golang.org)
-[![Version](https://img.shields.io/badge/version-v0.6.0-green.svg)](https://github.com/Jeffrin-dev/CloudDev/releases)
+[![Version](https://img.shields.io/badge/version-v0.7.0-green.svg)](https://github.com/Jeffrin-dev/CloudDev/releases)
 
 ---
 
 ## ✨ Features
 
-- **37 AWS services** emulated locally — S3, DynamoDB, DynamoDB Streams, Lambda, Lambda Layers, Lambda Function URLs, SQS (+ FIFO), SNS, API Gateway, API Gateway v2, IAM, STS, KMS, CloudFormation, Step Functions, EventBridge, CloudWatch Events, Secrets Manager, CloudWatch Logs, CloudWatch Metrics, ElastiCache, Cognito, X-Ray, Route53, SSM Parameter Store, Rekognition, SES, Bedrock, Kinesis Data Streams, Kinesis Firehose, ECS, ECR, CloudFront, AppSync, Athena, and ACM
+- **43 AWS services** emulated locally — S3, DynamoDB, DynamoDB Streams, Lambda, Lambda Layers, Lambda Function URLs, SQS (+ FIFO), SNS, API Gateway, API Gateway v2, IAM, STS, KMS, CloudFormation, Step Functions, EventBridge, CloudWatch Events, Secrets Manager, CloudWatch Logs, CloudWatch Metrics, ElastiCache, Cognito, X-Ray, Route53, SSM Parameter Store, Rekognition, SES, Bedrock, Kinesis Data Streams, Kinesis Firehose, ECS, ECR, CloudFront, AppSync, Athena, ACM, EC2, RDS, OpenSearch, MSK, CodePipeline, and WAF
 - **Single binary** — no Docker, no Python, no Java runtime required
 - **Zero config** — works out of the box with your existing AWS CLI and SDKs
 - **Web dashboard** — real-time service status at `localhost:4580` with offline detection
@@ -148,6 +148,49 @@ aws --endpoint-url=http://localhost:4564 athena start-query-execution \
 # ACM
 aws --endpoint-url=http://localhost:4560 acm request-certificate \
     --domain-name example.com
+
+# EC2
+aws --endpoint-url=http://localhost:4600 ec2 run-instances \
+    --image-id ami-00000001 --instance-type t2.micro --key-name mykey
+aws --endpoint-url=http://localhost:4600 ec2 describe-instances
+aws --endpoint-url=http://localhost:4600 ec2 create-security-group \
+    --group-name mysg --description "my security group"
+
+# RDS
+aws --endpoint-url=http://localhost:4601 rds create-db-instance \
+    --db-instance-identifier mydb --db-instance-class db.t3.micro \
+    --engine postgres --master-username admin --db-name mydb
+aws --endpoint-url=http://localhost:4601 rds create-db-snapshot \
+    --db-instance-identifier mydb --db-snapshot-identifier mysnap
+
+# OpenSearch
+aws opensearch create-domain --domain-name mydomain \
+    --engine-version OpenSearch_2.3 \
+    --endpoint-url http://localhost:4602
+aws opensearch list-domain-names --endpoint-url http://localhost:4602
+
+# MSK
+aws kafka create-cluster --cluster-name mycluster \
+    --number-of-broker-nodes 2 --kafka-version 3.4.0 \
+    --broker-node-group-info InstanceType=kafka.m5.large,ClientSubnets=subnet-1 \
+    --endpoint-url http://localhost:4603
+aws kafka get-bootstrap-brokers \
+    --cluster-arn arn:aws:kafka:us-east-1:000000000000:cluster/mycluster/... \
+    --endpoint-url http://localhost:4603
+
+# CodePipeline
+aws codepipeline create-pipeline \
+    --cli-input-json file:///tmp/pipeline.json \
+    --endpoint-url http://localhost:4604
+aws codepipeline start-pipeline-execution \
+    --name mypipeline --endpoint-url http://localhost:4604
+
+# WAF
+aws wafv2 create-web-acl --name myacl --scope REGIONAL \
+    --default-action Allow={} \
+    --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=myacl \
+    --endpoint-url http://localhost:4605
+aws wafv2 list-web-acls --scope REGIONAL --endpoint-url http://localhost:4605
 ```
 
 ---
@@ -194,6 +237,12 @@ aws --endpoint-url=http://localhost:4560 acm request-certificate \
 | ElastiCache (HTTP) | 4597 | v0.3.0 |
 | ElastiCache (Redis) | 4598 | v0.3.0 |
 | KMS | 4599 | v0.3.0 |
+| EC2 | 4600 | v0.7.0 |
+| RDS | 4601 | v0.7.0 |
+| OpenSearch | 4602 | v0.7.0 |
+| MSK | 4603 | v0.7.0 |
+| CodePipeline | 4604 | v0.7.0 |
+| WAF | 4605 | v0.7.0 |
 
 ---
 
@@ -221,9 +270,11 @@ clouddev/
 │       ├── cloudwatchevents/
 │       ├── cloudwatchlogs/
 │       ├── cloudwatchmetrics/
+│       ├── codepipeline/
 │       ├── cognito/
 │       ├── dynamodb/
 │       ├── dynamodbstreams/
+│       ├── ec2/
 │       ├── ecr/
 │       ├── ecs/
 │       ├── elasticache/
@@ -235,6 +286,9 @@ clouddev/
 │       ├── lambda/
 │       ├── lambdalayers/
 │       ├── lambdaurls/
+│       ├── msk/
+│       ├── opensearch/
+│       ├── rds/
 │       ├── rekognition/
 │       ├── route53/
 │       ├── s3/
@@ -245,6 +299,7 @@ clouddev/
 │       ├── ssm/
 │       ├── stepfunctions/
 │       ├── sts/
+│       ├── waf/
 │       └── xray/
 ├── go.mod
 └── main.go
@@ -313,6 +368,14 @@ go test ./...
 - [x] AppSync
 - [x] Athena
 - [x] ACM (Certificate Manager)
+
+### ✅ v0.7.0
+- [x] EC2 (Elastic Compute Cloud) — instances, AMIs, key pairs, security groups
+- [x] RDS (Relational Database Service) — DB instances, snapshots, parameter groups
+- [x] OpenSearch — domains, indices, tags
+- [x] MSK (Managed Streaming for Kafka) — clusters, brokers, bootstrap endpoints
+- [x] CodePipeline — pipelines, stages, executions
+- [x] WAF (Web Application Firewall) — Web ACLs, rule groups, associations
 
 ---
 
