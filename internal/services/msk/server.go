@@ -17,24 +17,24 @@ const (
 )
 
 type BrokerNodeGroup struct {
-	InstanceType  string   `json:"InstanceType"`
-	ClientSubnets []string `json:"ClientSubnets"`
+	InstanceType  string   `json:"instanceType"`
+	ClientSubnets []string `json:"clientSubnets"`
 }
 
 type Cluster struct {
-	ClusterName         string          `json:"ClusterName"`
-	ClusterArn          string          `json:"ClusterArn"`
-	State               string          `json:"State"`
-	NumberOfBrokerNodes int             `json:"NumberOfBrokerNodes"`
-	KafkaVersion        string          `json:"KafkaVersion"`
-	BrokerNodeGroupInfo BrokerNodeGroup `json:"BrokerNodeGroupInfo"`
+	ClusterName         string          `json:"clusterName"`
+	ClusterArn          string          `json:"clusterArn"`
+	State               string          `json:"state"`
+	NumberOfBrokerNodes int             `json:"numberOfBrokerNodes"`
+	KafkaVersion        string          `json:"kafkaVersion"`
+	BrokerNodeGroupInfo BrokerNodeGroup `json:"brokerNodeGroupInfo"`
 }
 
 type createClusterRequest struct {
-	ClusterName         string          `json:"ClusterName"`
-	NumberOfBrokerNodes int             `json:"NumberOfBrokerNodes"`
-	KafkaVersion        string          `json:"KafkaVersion"`
-	BrokerNodeGroupInfo BrokerNodeGroup `json:"BrokerNodeGroupInfo"`
+	ClusterName         string          `json:"clusterName"`
+	NumberOfBrokerNodes int             `json:"numberOfBrokerNodes"`
+	KafkaVersion        string          `json:"kafkaVersion"`
+	BrokerNodeGroupInfo BrokerNodeGroup `json:"brokerNodeGroupInfo"`
 }
 
 type server struct {
@@ -105,7 +105,10 @@ func (s *server) handleListClusters(w http.ResponseWriter) {
 		clusters = append(clusters, c)
 	}
 	s.mu.RUnlock()
-	writeJSON(w, http.StatusOK, map[string]interface{}{"ClusterInfoList": clusters})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"clusterInfoList": clusters,
+		"ClusterInfoList": clusters,
+	})
 }
 
 func (s *server) handleDescribeCluster(w http.ResponseWriter, clusterArn string) {
@@ -116,7 +119,10 @@ func (s *server) handleDescribeCluster(w http.ResponseWriter, clusterArn string)
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "cluster not found"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"ClusterInfo": cluster})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"clusterInfo": cluster,
+		"ClusterInfo": cluster,
+	})
 }
 
 func (s *server) handleDeleteCluster(w http.ResponseWriter, clusterArn string) {
@@ -130,7 +136,12 @@ func (s *server) handleDeleteCluster(w http.ResponseWriter, clusterArn string) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "cluster not found"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"ClusterArn": clusterArn, "State": "DELETING"})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"clusterArn": clusterArn,
+		"ClusterArn": clusterArn,
+		"state":      "DELETING",
+		"State":      "DELETING",
+	})
 }
 
 func (s *server) handleGetBootstrapBrokers(w http.ResponseWriter, clusterArn string) {
@@ -142,7 +153,9 @@ func (s *server) handleGetBootstrapBrokers(w http.ResponseWriter, clusterArn str
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
+		"bootstrapBrokerString":          "localhost:9092,localhost:9093",
 		"BootstrapBrokerString":          "localhost:9092,localhost:9093",
+		"bootstrapBrokerStringSaslScram": "localhost:9094",
 		"BootstrapBrokerStringSaslScram": "localhost:9094",
 	})
 }
@@ -155,7 +168,10 @@ func (s *server) handleRebootBroker(w http.ResponseWriter, clusterArn string) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "cluster not found"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"ClusterArn": clusterArn})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"clusterArn": clusterArn,
+		"ClusterArn": clusterArn,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
