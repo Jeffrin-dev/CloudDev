@@ -386,10 +386,12 @@ var upCmd = &cobra.Command{
 				"cognito":              4596,
 				"rekognition":          4594,
 				"lambda_function_urls": 4595,
+				"ec2":                  4600,
 				"rds":                  4601,
 				"opensearch":           4602,
 				"msk":                  4603,
 				"codepipeline":         4604,
+				"waf":                  4605,
 			}
 			if err := dashboard.Start(4580, serviceMap); err != nil {
 				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
