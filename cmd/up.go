@@ -22,6 +22,7 @@ import (
 	"github.com/clouddev/clouddev/internal/services/cloudwatchevents"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchlogs"
 	"github.com/clouddev/clouddev/internal/services/cloudwatchmetrics"
+	"github.com/clouddev/clouddev/internal/services/codepipeline"
 	"github.com/clouddev/clouddev/internal/services/cognito"
 	"github.com/clouddev/clouddev/internal/services/dynamodb"
 	"github.com/clouddev/clouddev/internal/services/dynamodbstreams"
@@ -237,6 +238,12 @@ var upCmd = &cobra.Command{
 		}()
 		printSuccess("OpenSearch server starting on port %d", 4602)
 		go func() {
+			if err := codepipeline.Start(4604); err != nil {
+				fmt.Fprintf(os.Stderr, "CodePipeline server error: %v\n", err)
+			}
+		}()
+		printSuccess("CodePipeline server starting on port %d", 4604)
+		go func() {
 			if err := msk.Start(4603); err != nil {
 				fmt.Fprintf(os.Stderr, "MSK server error: %v\n", err)
 			}
@@ -375,6 +382,7 @@ var upCmd = &cobra.Command{
 				"rds":                  4601,
 				"opensearch":           4602,
 				"msk":                  4603,
+				"codepipeline":         4604,
 			}
 			if err := dashboard.Start(4580, serviceMap); err != nil {
 				fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
